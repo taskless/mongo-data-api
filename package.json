@@ -1,0 +1,76 @@
+{
+  "name": "@taskless/mongo-data-api",
+  "description": "Mongo Data API client using fetch, suitable for lambda and edge functions",
+  "version": "0.0.1",
+  "author": "Jakob Heuser",
+  "license": "MIT",
+  "homepage": "https://github.com/taskless/mongo-data-api/",
+  "repository": "taskless/mongo-data-api.git",
+  "scripts": {
+    "lint-staged": "lint-staged",
+    "make": "make",
+    "prepare": "husky install",
+    "test": "echo \"Error: no test specified\" && exit 0",
+    "tsup": "tsup",
+    "typecheck": "tsc --noEmit",
+    "xo": "xo"
+  },
+  "tsup": {
+    "entry": [
+      "src/index.ts"
+    ],
+    "format": [
+      "esm",
+      "cjs"
+    ],
+    "splitting": false,
+    "sourcemap": true,
+    "clean": true,
+    "dts": true,
+    "minify": false
+  },
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "package.json",
+    "README.md",
+    "dist",
+    "src"
+  ],
+  "engines": {
+    "node": ">=14.19.0",
+    "pnpm": "8.x"
+  },
+  "dependencies": {
+    "bson": "^5.2.0",
+    "tslib": "^2.5.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^15.0.0",
+    "@commitlint/config-conventional": "^15.0.0",
+    "@types/node": "^18.15.11",
+    "esbuild": "0.17.16",
+    "husky": "^7.0.4",
+    "lint-staged": "13.0.3",
+    "mongodb": "^5.3.0",
+    "npm-run-all": "^4.1.5",
+    "release-it": "^15.10.2",
+    "shx": "^0.3.4",
+    "syncpack": "^7.2.1",
+    "tsup": "^6.7.0",
+    "typescript": "^5.0.4",
+    "xo": "0.54.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

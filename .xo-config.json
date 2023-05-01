@@ -1,0 +1,23 @@
+{
+  "prettier": true,
+  "space": true,
+  "nodeVersion": false,
+  "rules": {
+    "@typescript-eslint/array-type": [
+      "error",
+      { "default": "array", "readonly": "array" }
+    ],
+    "@typescript-eslint/naming-convention": "off",
+    "@typescript-eslint/no-floating-promises": "off",
+    "@typescript-eslint/parameter-properties": [
+      "error",
+      {
+        "prefer": "class-property"
+      }
+    ],
+    "capitalized-comments": "off",
+    "no-template-curly-in-string": "warn",
+    "unicorn/filename-case": "off"
+  },
+  "plugins": []
+}

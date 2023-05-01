@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ES2020",
+    "moduleResolution": "node16",
+    "types": ["node"],
+    "allowSyntheticDefaultImports": true,
+    "alwaysStrict": false,
+    "declaration": false,
+    "downlevelIteration": true,
+    "esModuleInterop": true,
+    "importHelpers": false, // no longer needed thanks to tsup
+    "inlineSources": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitAny": false,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "preserveWatchOutput": true,
+    "pretty": true,
+    "sourceMap": true,
+    "strict": true,
+    "strictBindCallApply": false
+  }
+}
