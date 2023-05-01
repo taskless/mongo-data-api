@@ -1,4 +1,4 @@
-import { type Document, EJSON } from "bson";
+import { EJSON, ObjectId } from "bson";
 import type {
   Sort,
   Filter,
@@ -6,11 +6,17 @@ import type {
   UpdateFilter,
   WithId,
   WithoutId,
+  Document,
 } from "mongodb";
 import type { AuthOptions } from "./authTypes.js";
+import { MongoDataAPIError } from "./errors.js";
+
+// reexport bson types
+export { EJSON, ObjectId } from "bson";
 
 // reexport relevant mongo types
 export type {
+  Document,
   Sort,
   Filter,
   OptionalUnlessRequiredId,
@@ -21,6 +27,9 @@ export type {
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 type Nullable<T> = T | null;
+
+/** A data API response object */
+type DataAPIResponse<T> = { data?: T; error?: MongoDataAPIError };
 
 export type CustomFetch = {
   fetch: typeof fetch;
@@ -38,7 +47,7 @@ export type MongoClientConstructorOptions = {
    *
    * Your endpoint information is available at https://cloud.mongodb.com/v2/<projectId>#/dataAPI
    */
-  endpoint: string;
+  endpoint: URL | string;
   /**
    * The [Atlas Data Source](https://cloud.mongodb.com/v2/<projectId>#/dataAPI). This tells
    * mongo which Cluster you want to run your queries against. The default data source
@@ -85,7 +94,7 @@ export class MongoClient {
     fetch: customFetch,
   }: MongoClientConstructorOptions) {
     this.dataSource = dataSource;
-    this.endpoint = endpoint;
+    this.endpoint = endpoint instanceof URL ? endpoint.toString() : endpoint;
 
     // create fetch implementation, preferring a ponyfill, then falling back to globals
     if (customFetch) {
@@ -171,7 +180,7 @@ export class Database {
  * Represents a Mongo Collection object of type `<T>`, providing query
  * methods in a fluent interface.
  */
-export class Collection<TSchema> {
+export class Collection<TSchema = Document> {
   name: string;
   database: Database;
   client: MongoClient;
@@ -257,7 +266,7 @@ export class Collection<TSchema> {
    */
   async insertOne(
     document: OptionalUnlessRequiredId<TSchema>
-  ): Promise<{ insertedId: string }> {
+  ): Promise<DataAPIResponse<{ insertedId: string }>> {
     return this.callApi("insertOne", {
       document,
     });
@@ -270,7 +279,7 @@ export class Collection<TSchema> {
    */
   async insertMany(
     documents: OptionalUnlessRequiredId<TSchema>[]
-  ): Promise<{ insertedIds: string[] }> {
+  ): Promise<DataAPIResponse<{ insertedIds: string[] }>> {
     return this.callApi("insertMany", { documents });
   }
 
@@ -290,11 +299,13 @@ export class Collection<TSchema> {
     filter: Filter<TSchema>,
     update: UpdateFilter<TSchema> | Partial<TSchema>,
     options: { upsert?: boolean } = {}
-  ): Promise<{
-    matchedCount: number;
-    modifiedCount: number;
-    upsertedId?: string;
-  }> {
+  ): Promise<
+    DataAPIResponse<{
+      matchedCount: number;
+      modifiedCount: number;
+      upsertedId?: string;
+    }>
+  > {
     return this.callApi("updateOne", {
       filter,
       update,
@@ -318,11 +329,13 @@ export class Collection<TSchema> {
     filter: Filter<TSchema>,
     update: UpdateFilter<TSchema>,
     { upsert }: { upsert?: boolean } = {}
-  ): Promise<{
-    matchedCount: number;
-    modifiedCount: number;
-    upsertedId?: string;
-  }> {
+  ): Promise<
+    DataAPIResponse<{
+      matchedCount: number;
+      modifiedCount: number;
+      upsertedId?: string;
+    }>
+  > {
     return this.callApi("updateMany", {
       filter,
       update,
@@ -346,11 +359,13 @@ export class Collection<TSchema> {
     filter: Filter<TSchema>,
     replacement: WithoutId<TSchema>,
     options: { upsert?: boolean } = {}
-  ): Promise<{
-    matchedCount: number;
-    modifiedCount: number;
-    upsertedId?: string;
-  }> {
+  ): Promise<
+    DataAPIResponse<{
+      matchedCount: number;
+      modifiedCount: number;
+      upsertedId?: string;
+    }>
+  > {
     return this.callApi("replaceOne", {
       filter,
       replacement,
@@ -363,7 +378,9 @@ export class Collection<TSchema> {
    * @param filter A [MongoDB Query Filter](https://www.mongodb.com/docs/manual/tutorial/query-documents/). The deleteOne action deletes the first document in the collection that matches this filter.
    * @returns The deleteOne action returns the number of deleted documents in the deletedCount field
    */
-  async deleteOne(filter: Filter<TSchema>): Promise<{ deletedCount: number }> {
+  async deleteOne(
+    filter: Filter<TSchema>
+  ): Promise<DataAPIResponse<{ deletedCount: number }>> {
     return this.callApi("deleteOne", {
       filter,
     });
@@ -374,7 +391,9 @@ export class Collection<TSchema> {
    * @param filter A [MongoDB Query Filter](https://www.mongodb.com/docs/manual/tutorial/query-documents/). The deleteMany action deletes all documents in the collection that match this filter.
    * @returns The deleteMany action returns the number of deleted documents in the deletedCount field
    */
-  async deleteMany(filter: Filter<TSchema>): Promise<{ deletedCount: number }> {
+  async deleteMany(
+    filter: Filter<TSchema>
+  ): Promise<DataAPIResponse<{ deletedCount: number }>> {
     return this.callApi("deleteMany", { filter });
   }
 
@@ -383,19 +402,28 @@ export class Collection<TSchema> {
    * @param pipeline A [MongoDB Aggregation Pipeline](https://www.mongodb.com/docs/manual/core/aggregation-pipeline/).
    * @returns The aggregate action returns the result set of the final stage of the pipeline as an array of documents, automatically unwrapping the Atlas `documents` field
    */
-  async aggregate<TAggregateResult = Document>(
+  async aggregate<TOutput = Document>(
     pipeline: Document[]
-  ): Promise<TAggregateResult[]> {
-    const response = await this.callApi<{ documents: TAggregateResult[] }>(
-      "aggregate",
-      {
-        pipeline,
-      }
-    );
-    return response.documents;
+  ): Promise<DataAPIResponse<TOutput[]>> {
+    const response = await this.callApi<{ documents: TOutput[] }>("aggregate", {
+      pipeline,
+    });
+
+    return response.data
+      ? { data: response.data.documents }
+      : { error: response.error ?? new MongoDataAPIError("Unknown error", -1) };
   }
 
-  async callApi<T = unknown>(method: string, extra: Document): Promise<T> {
+  /**
+   * Call a raw Data API resource
+   * @param method The Data API resource to call
+   * @param body The JSON body to include, merged with the collection, dataSource, and database names
+   * @returns The response from the Data API, or a DataAPIError if the request failed
+   */
+  async callApi<T = unknown>(
+    method: string,
+    body: Record<string, unknown>
+  ): Promise<DataAPIResponse<T>> {
     const { endpoint, dataSource, headers } = this.client;
     const url = `${endpoint}/action/${method}`;
 
@@ -406,16 +434,43 @@ export class Collection<TSchema> {
         collection: this.name,
         database: this.database.name,
         dataSource,
-        ...extra,
+        ...body,
       }),
     });
 
-    const body = await response.text();
+    // interpret response code
+    // https://www.mongodb.com/docs/atlas/api/data-api-resources/#error-codes
+    if (
+      response.status in [400, 401, 404] ||
+      (response.status >= 500 && response.status < 600)
+    ) {
+      let errorText: string | undefined;
+      try {
+        errorText = await response.text();
+      } catch {
+        // ignore failed parsing of response text
+      }
 
-    if (!response.ok) {
-      throw new Error(`${response.statusText}: ${body}`);
+      const fallbackMessage = {
+        400: "Bad Request",
+        401: "Unauthorized",
+        404: "Not Found",
+        500: "Internal Server Error",
+      };
+
+      return {
+        error: new MongoDataAPIError(
+          response.statusText ??
+            errorText ??
+            fallbackMessage?.[response.status] ??
+            "Data API Error",
+          response.status
+        ),
+      };
     }
 
-    return EJSON.parse(body) as T;
+    const text = await response.text();
+
+    return { data: EJSON.parse(text) as T };
   }
 }

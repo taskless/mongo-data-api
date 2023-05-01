@@ -1,163 +1,287 @@
 <h1 align="center">
-  <span style="font-size:24px">🧼 TSoapy</span><br />
-  <sub><i>Type-Safe OpenAPI Calls</i></sub>
+  <span style="font-size:24px">🌿🕸️ Mongo Data API</span><br />
+  <sub><i>Mongo Client for an HTTPS World. Lambda and edge function friendly</i></sub>
 </h1>
 
-> Create a fully-typed & lightweight client for your [openapi-typescript](https://github.com/drwpow/openapi-typescript) type definitions. Zero dependencies. 2.4k. Optimized for OpenAPI v3.
+> A Mongo-like API for accessing the http-based [Mongo Data API](https://www.mongodb.com/docs/atlas/api/data-api/). Uses [BSON](https://www.npmjs.com/package/bson) to provide access to standard Mongo data types. BYO `fetch()` for maximum portability.
+
+- [Usage](#usage)
+  - [Authentication](#authentication)
+    - [Using a Data API api key (preferred)](#using-a-data-api-api-key-preferred)
+    - [Using Email and Password](#using-email-and-password)
+    - [Using a custom JWT](#using-a-custom-jwt)
+- [Supported Methods and API](#supported-methods-and-api)
+  - [Create a Mongo Client](#create-a-mongo-client)
+  - [Select a Database](#select-a-database)
+  - [Select a Collection](#select-a-collection)
+  - [Collection Methods](#collection-methods)
+    - [Return Type](#return-type)
+    - [Methods](#methods)
+      - [findOne](#findone)
+      - [find](#find)
+      - [insertOne](#insertone)
+      - [insertMany](#insertmany)
+      - [updateOne](#updateone)
+      - [updateMany](#updatemany)
+      - [replaceOne](#replaceone)
+      - [deleteOne](#deleteone)
+      - [deleteMany](#deletemany)
+      - [aggregate](#aggregate)
+      - [callApi](#callapi)
+- [Errors](#errors)
+- [FAQ](#faq)
+- [License](#license)
 
 # Usage
 
-Taken from the [Pet Store Example](https://github.com/jakobo/tsoapy/blob/main/src/examples/petstore.ts)
-
 ```ts
-import type { paths } from "../__generated__/petstore";
-import { tsoapy } from "../";
+import { MongoClient } from "@taskless/mongo-data-api";
 
-const client = tsoapy<paths>(new URL("https://example.com/api/petstore"));
+const mc = new MongoClient({
+  /** @type URL | string */
+  endpoint: new URL(process.env.MONGO_HTTP_URL ?? "[not defined]"),
+  /** @type string */
+  dataSource: process.env.MONGO_HTTP_DATA_SOURCE ?? "[not defined]",
 
-// call your api using .path().method() to select the specific endpoint you need
-const r1 = await client
-  .path("/store/order")
-  .method("post")
-  // then, include your body, set params, query string, etc
-  .body({
-    id: 123,
-    petId: 456,
-    quantity: 1,
-    shipDate: "2023-02-25T00:00:00Z",
-    status: "placed",
-    complete: false,
-  })
-  // send the request and get a descriminated union as a response
-  .send();
+  /* See "Authentication" below */
+  auth: {
+    /* ... */
+  },
+});
 
-if (r1.status === 200) {
-  // union is discriminated on .status, and contains a .data property
-  r1.data.id; // <= typed from response
-}
+await mc.findOne({
+  /* good 'ole mongo */
+});
 ```
 
-# API
+## Authentication
 
-Descriptions here provide a generic type such as `string` for clarity, but use a more complex typing in the codebase
+Authenticating to the Mongo Data API is done with either an API Key, an email/password, or via a JWT string:
 
-## `tsoapy<paths>(url: URL, ctx?: ExtendedRequestInit)`
-
-Configure the initial value of tsoapy, including the URL base all `path` values are derrived from, and any `RequestInit` options you want to share between all chained methods.
-
-**Returns:** An object containing the single `.path()` method.
-
-| arg | description                                                                                                |
-| :-- | :--------------------------------------------------------------------------------------------------------- |
-| url | `URL` The endpoint URL for your OpenAPI calls                                                              |
-| ctx | Options to persist into `fetch` calls. You may also specify `ctx.fetch` to use a non-global fetch instance |
-
-#### _tsoapy()_`.path(path: string)`
-
-Select a `path` from the tsoapy collection.
-
-**Returns:** An object containing the single `.method()` method.
-
-| arg  | description                                       |
-| :--- | :------------------------------------------------ |
-| path | `string` A path contained in your `OpenAPI` types |
-
-#### _tsoapy().path()_`.method(method: string, contentType?: string, serialize: Function)`
-
-Select a `method` from the tsoapy collection, constrained to the previously built `path`. Because OpenAPI JSON is top-down desiged (`path => method => params`), you need to have a path before you can select a method. During method selection, you can specify a content type other than the default `application/json`, and set up a custom `serialize` function for converting your request object to a string.
-
-**Returns:** A tsoapy builder object for configuring the request data, containing `params`, `query`, `body`, and `send`
-
-| arg         | description                                                                                                                                                                                                                         |
-| :---------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| method      | `string` A method contained in `OpenAPI[path]`                                                                                                                                                                                      |
-| contentType | `string` A supported content type found in `OpenAPI[path][method].requestBody.content`                                                                                                                                              |
-| serialize   | `function` A function that takes in the arguments of `OpenAPI[path][method].requestBody.content[contentType]` and returns a `string`. Defaults to `JSON.serialize` for `application/json` and `toString()` for other content types. |
-
-## Tsoapy Builder `Builder`
-
-After chaining `tsoapy().path().method()`, the API opens up in order to configure and send the request. Depending on your OpenAPI endpoint, you may need to set URL parameters, configure query string values, or set the request body. Once configured, you can send the request via `.send()`, returning a promise containing the API result.
-
-#### _tsoapy().path().method()..._`.params(params: object)`
-
-Set URL parameters in a request such as `/pet/{petId}`.
-
-**Returns:** `Builder` object for configuring the request data, containing `params`, `query`, `body`, and `send`
-
-| arg    | description                                                                   |
-| :----- | :---------------------------------------------------------------------------- |
-| params | `object` Details parameters to substitue into the url, such as `/pet/{petId}` |
-
-#### _tsoapy().path().method()..._`.query(query: object)`
-
-Set query string parameters for the request.
-
-**Returns:** `Builder` object for configuring the request data, containing `params`, `query`, `body`, and `send`
-
-| arg   | description                                                 |
-| :---- | :---------------------------------------------------------- |
-| query | `object` Details query string values to append onto the url |
-
-#### _tsoapy().path().method()..._`.body(body: object)`
-
-Set the body for the request. Will use `serializer` to conver the object to a suitable string, defaulting to `JSON.stringify()`.
-
-**Returns:** `Builder` object for configuring the request data, containing `params`, `query`, `body`, and `send`
-
-| arg  | description                                                                                                                                                                                               |
-| :--- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| body | `object` Operation variables. Will be serialized to a string using the provided `serialize`, and falling back to `JSON.stringify` for the `application/json` content type and `toString()` for all others |
-
-#### _tsoapy().path().method()..._`.send(options?: RequestInit, contentType?: string, deserialize?: Function):Promise`
-
-Send the request via `fetch`.
-
-| arg         | description                                                                                                                                                                                                                                                        |
-| :---------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| options     | `RequestInit` Additional fetch options, in addition to any specified in the original `tsoapy` call                                                                                                                                                                 |
-| contentType | `string` A supported content type found in `OpenAPI[path][method].responses[*].content`                                                                                                                                                                            |
-| deserialize | `function` A function that takes in a `string` and `statusCode`, and returns a value consistent with `OpenAPI[path][method].responses[statusCode].content[contentType]`. Defaults to `JSON.parse` for `application/json` and `toString()` for other content types. |
-
-**Returns:** A tsoapy response as a discriminated union in the following format:
+### Using a Data API api key (preferred)
 
 ```ts
 {
-  status: number;
-  data: object;
+  // ...
+  auth: {
+    /** @type string */
+    apiKey: process.env.MONGO_HTTP_API_KEY ?? "[not defined]",
+  },
 }
 ```
 
-| property | description                                                       |
-| :------- | :---------------------------------------------------------------- |
-| status   | `number` Discriminator based on the response code from the server |
-| data     | `object` Content from the request                                 |
+### Using Email and Password
 
-# Sending Content Types other than `application/json`
+```ts
+{
+  // ...
+  auth: {
+    /** @type string */
+    email: process.env.MONGO_EMAIL ?? "",
+    /** @type string */
+    password: process.env.MONGO_PASSWORD ?? "",
+  },
+}
+```
 
-Tsoapy uses `application/json` by default for requests & responses. If you need to change this, you can control the input and output handing.
+### Using a custom JWT
 
-- **input** typing and serialization is controlled when calling `.method()`. In addition to setting the content type (which selects the `responseBody` from OpenAPI), the third parameter `serialize` allows you to pass in a custom serializer function for turning the JSON object into the requested content type, expressed as a string. Because there's a variety of content types, it's beyond Tsoapy to add custom converters for every possible serialization.
-- **output** typing and deserialization is controlled when calling `.send()`. Like `method`, you can pass a content type as the second argument which maps to a content type inside of the OpenAPI `responses.[code]` collection. The third parameter `deserialize` can be a function that takes in a string and returns a JSON object conforming to the object schema on OpenAPIs side. Like serialization, adding custom deserialization goes beyond the scope of this library.
+```ts
+{
+  // ...
+  auth: {
+    /** @type string */
+    jwtTokenString: request.headers.get("jwt"),
+  },
+}
+```
 
-> ⚠️ **note** You'll need to specify your content type and serializer/deserializer every time, as OpenAPI is designed in a top-down method of `path => method => requestBody => content => [contentType]` and `path => method => responses => [code] => content => [contentType]`, making it difficult to set these at the top-level `tsoapy()` as you do not know at that time which path & method (and therefore which content types) you are invoking.
+# Supported Methods and API
 
-## Common Serializer / Deserializers
+## Create a Mongo Client
 
-If JSON isn't sufficient and you do need to serialize / deserialize in order to talk to your OpenAPI endpoint, there are already excellent battle-tested libraries that can be dropped into tsoapy without much effort.
+```ts
+const client = new MongoClient(options);
+```
 
-- `application/xml` - [xml2json](https://www.npmjs.com/package/xml2json)
-- `application/x-www-form-urlencoded` - [form-urlencoded](https://www.npmjs.com/package/form-urlencoded)
+- `options` - MongoClient options
+  - `options.endpoint` - `string | URL` an endpoint for sending requests to. Your Data API Endpoint is available at your Mongo Data API UI `https://cloud.mongodb.com/v2/<projectId>#/dataAPI`, where `<projectId>` is your project ID. A single Data API is usable for the entire project, with individual data sources routing to specific atlas instances.
+  - `options.dataSource` - `string` the `Data Source` for your Data API. On the Data API UI, this is the "Data Source" column, and usually is either a 1:1 mapping of your cluster name, or the default `mongodb-atlas` if you enabled Data API through the Atlas Admin UI.
+  - `options.auth` - `AuthOptions` one of the authentication methods, either api key, email & password, or a custom JWT string. At this time, only [Credential Authentication](https://www.mongodb.com/docs/atlas/api/data-api/#credential-authentication) is supported.
+
+## Select a Database
+
+```ts
+const db = client.db(databaseName);
+```
+
+- `databaseName` - `string` the name of the database to connect to
+
+## Select a Collection
+
+```ts
+const collection = db.collection<TSchema>(collectionName);
+```
+
+- `collectionName` - `string` the name of the collection to connect to
+- `<TSchema>` - _generic_ A Type or Interface that describes the documents in this collection. Defaults to the generic MongoDB `Document` type
+
+## Collection Methods
+
+The following [Data API resources](https://www.mongodb.com/docs/atlas/api/data-api-resources/) are supported
+
+| resource     | support |
+| :----------- | :-----: |
+| `findOne`    |   ✅    |
+| `find`       |   ✅    |
+| `insertOne`  |   ✅    |
+| `insertMany` |   ✅    |
+| `updateOne`  |   ✅    |
+| `updateMany` |   ✅    |
+| `replaceOne` |   ✅    |
+| `deleteOne`  |   ✅    |
+| `deleteMany` |   ✅    |
+| `aggregate`  |   ✅    |
+
+Should Data API add support for other resources, the `callApi` method allows you to pass arbitrary JSON to a Data API resource. `mongo-data-api` automatically merges the `dataSource`, `database`, and `collection` parameters in if not specified.
+
+### Return Type
+
+All collection methods return an object containing `data?` and `error?`. This avoids throwing during requests, making it easier to handle the response without nesting try/catch operations.
+
+```ts
+interface DataAPIResponse {
+  data?: TSchema;
+  error?: DataAPIError;
+}
+```
+
+### Methods
+
+#### findOne
+
+```ts
+const { data, error } = await collection.findOne(filter, options);
+```
+
+- `filter?` - `Filter<TSchema>` A [MongoDB Query Filter](https://www.mongodb.com/docs/manual/tutorial/query-documents/)
+- `options?` - Query options
+  - `options.projection?` - `Document` A [MongoDB Query Projection](https://www.mongodb.com/docs/manual/tutorial/project-fields-from-query-results/)
+
+#### find
+
+```ts
+const { data, error } = await collection.find(filter, options);
+```
+
+- `filter?` - `Filter<TSchema>` A [MongoDB Query Filter](https://www.mongodb.com/docs/manual/tutorial/query-documents/)
+- `options?` Query options
+  - `options.projection?` - `Document` A [MongoDB Query Projection](https://www.mongodb.com/docs/manual/tutorial/project-fields-from-query-results/)
+  - `options.sort?` - `Sort` A [MongoDB Sort Expression](https://www.mongodb.com/docs/manual/reference/operator/aggregation/sort/)
+  - `options.limit?` - `number` The maximum number of matched documents to include in the returned result set. Each request may return up to 50,000 documents.
+  - `options.skip?` - `number` The number of matched documents to skip before adding matched documents to the result set.
+
+#### insertOne
+
+```ts
+const { data, error } = await collection.insertOne(document);
+```
+
+- `document` - `TSchema` The document to insert
+
+#### insertMany
+
+```ts
+const { data, error } = await collection.insertMany(documents);
+```
+
+- `documents` - `TSchema[]` The documents to insert
+
+#### updateOne
+
+```ts
+const { data, error } = await collection.updateOne(filter, update, options);
+```
+
+- `filter` - `Filter<TSchema>` A [MongoDB Query Filter](https://www.mongodb.com/docs/manual/tutorial/query-documents/)
+- `update` - `UpdateFilter<TSchema> | Partial<TSchema>` A [MongoDB Update Expression](https://www.mongodb.com/docs/manual/tutorial/update-documents/) that specifies how to modify the matched document
+- `options?` Query options
+  - `options.upsert` - `boolean` The upsert flag only applies if no documents match the specified filter. If true, the updateOne action inserts a new document that matches the filter with the specified update applied to it.
+
+#### updateMany
+
+```ts
+const { data, error } = await collection.updateMany(filter, update, options);
+```
+
+- `filter` - `Filter<TSchema>` A [MongoDB Query Filter](https://www.mongodb.com/docs/manual/tutorial/query-documents/)
+- `update` - `UpdateFilter<TSchema> | Partial<TSchema>` A [MongoDB Update Expression](https://www.mongodb.com/docs/manual/tutorial/update-documents/) that specifies how to modify the matched document
+- `options?` Query options
+  - `options.upsert` - `boolean` The upsert flag only applies if no documents match the specified filter. If true, the updateOne action inserts a new document that matches the filter with the specified update applied to it.
+
+#### replaceOne
+
+```ts
+const { data, error } = await collection.replaceOne(
+  filter,
+  replacement,
+  options
+);
+```
+
+- `filter` - `Filter<TSchema>` A [MongoDB Query Filter](https://www.mongodb.com/docs/manual/tutorial/query-documents/)
+- `replacement` - `WithoutId<TSchema>` The replacement document, without an `_id` attribute
+- `options?` Query options
+  - `options.upsert` - `boolean` The upsert flag only applies if no documents match the specified filter. If true, the updateOne action inserts a new document that matches the filter with the specified update applied to it.
+
+#### deleteOne
+
+```ts
+const { data, error } = await collection.deleteOne(filter);
+```
+
+- `filter` - `Filter<TSchema>` A [MongoDB Query Filter](https://www.mongodb.com/docs/manual/tutorial/query-documents/)
+
+#### deleteMany
+
+```ts
+const { data, error } = await collection.deleteMany(filter);
+```
+
+- `filter` - `Filter<TSchema>` A [MongoDB Query Filter](https://www.mongodb.com/docs/manual/tutorial/query-documents/)
+
+#### aggregate
+
+```ts
+const { data, error } = await collection.aggregate<TOutput>(pipeline);
+```
+
+- `pipeline` - `Document[]` A [MongoDB Aggregation Pipeline](https://www.mongodb.com/docs/manual/core/aggregation-pipeline/)
+- `<TOutput>` - _generic_ A `Document` like object that describes the output of the aggregation pipeline
+
+#### callApi
+
+```ts
+const { data, error } = await collection.callApi<T>(method, body);
+```
+
+- `method` - `string` A supported Mongo Data API Request method
+- `body` - `Record<string, unknown>` An arbitrary key/value JSON-like data structure representing the body payload sent to the Mongo Data API
+- `<T>` - _generic_ Describes the return type of `data` on a successful API call
+
+# Errors
+
+Requests via `fetch()` have their resposne codes checked against the [Data API Error Codes](https://www.mongodb.com/docs/atlas/api/data-api-resources/#error-codes) and on error, set the `error` property of the response to a `MongoDataAPIError`.
+
+- `error.code` - `number` Contains the HTTP error code from the Mongo Data API
+- `error.message` - `string` Contains the response status text or error message included from the Data API call
 
 # FAQ
 
-- **Why is it so small?** Tsoapy is 90% type management. The [exported index.js](https://www.unpkg.com/tsoapy@0.0.4/dist/index.js) is the builder API, designed to build the `fetch` call in a way consistent with how you walk the OpenAPI paths object. In 0.0.4, the ESM version is 2.4kb and the CJS version is 3.43kb with the increase being the CommonJS harness provided by tsup.
-- **Why not `openapi`?** [openapi](https://www.npmjs.com/package/openapi) is an excellent library, but its types are not as semantically correct as those generated by [openapi-typescript](https://github.com/drwpow/openapi-typescript). By separating type generation from runtime library, you can stop using tsoapy, go back to plain `fetch` and still take advantage of the types generated by `openapi-typescript`. This also means that tsoapy can focus on being a really good `fetch` builder.
-
-# Stuff Still To Do
-
-- Tests (maybe using MSW as the network is at the heart of this)
-- There's a coercion of `number` to `ResultCodeOf<T, P, M>` which I can't seem to get right
+- **Why is `mongodb` in the dependencies?** The short answer is [TypeScript requires it](https://www.typescriptlang.org/docs/handbook/declaration-files/publishing.html#dependencies). The mongodb dependency is types-only and will not be included in your built lambda when using `tsc`, `rollup`, `webpack`, and other bundling tools. Unfortunately, to re-export the types, it must be included as a regular dependency instead of dev-dependency. You can verify that mongo is not included by looking at the [CommonJS build](./dist/index.cjs).
 
 # License
+
+This library started out as a fork of the excellent [deno atlas_sdk module](https://deno.land/x/atlas_sdk@v1.1.1), optimized for node.js.
 
 MIT

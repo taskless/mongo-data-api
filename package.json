@@ -7,13 +7,12 @@
   "homepage": "https://github.com/taskless/mongo-data-api/",
   "repository": "taskless/mongo-data-api.git",
   "scripts": {
-    "lint-staged": "lint-staged",
-    "make": "make",
+    "build": "tsup",
+    "clean": "shx rm -rf dist",
     "prepare": "husky install",
-    "test": "echo \"Error: no test specified\" && exit 0",
-    "tsup": "tsup",
+    "test": "ava",
     "typecheck": "tsc --noEmit",
-    "xo": "xo"
+    "yeet": "release-it"
   },
   "tsup": {
     "entry": [
@@ -52,20 +51,23 @@
   },
   "dependencies": {
     "bson": "^5.2.0",
+    "mongodb": "^5.3.0",
     "tslib": "^2.5.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^15.0.0",
     "@commitlint/config-conventional": "^15.0.0",
     "@types/node": "^18.15.11",
+    "ava": "^4.3.0",
+    "dotenv": "^16.0.3",
     "esbuild": "0.17.16",
     "husky": "^7.0.4",
     "lint-staged": "13.0.3",
-    "mongodb": "^5.3.0",
     "npm-run-all": "^4.1.5",
     "release-it": "^15.10.2",
     "shx": "^0.3.4",
     "syncpack": "^7.2.1",
+    "ts-node": "10.9.1",
     "tsup": "^6.7.0",
     "typescript": "^5.0.4",
     "xo": "0.54.2"
