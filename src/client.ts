@@ -1,4 +1,4 @@
-import { EJSON, ObjectId } from "bson";
+import { EJSON } from "bson";
 import type {
   Sort,
   Filter,
@@ -25,18 +25,18 @@ export type {
   WithoutId,
 } from "mongodb";
 
-// eslint-disable-next-line @typescript-eslint/ban-types
-type Nullable<T> = T | null;
-
-/** A data API response object */
-type DataAPIResponse<T> = { data?: T; error?: MongoDataAPIError };
-
 export type CustomFetch = {
   fetch: typeof fetch;
   Request: typeof Request;
   Response: typeof Response;
   Headers: typeof Headers;
 };
+
+// eslint-disable-next-line @typescript-eslint/ban-types
+type Nullable<T> = T | null;
+
+/** A data API response object */
+type DataAPIResponse<T> = { data?: T; error?: MongoDataAPIError };
 
 export type MongoClientConstructorOptions = {
   /**
@@ -67,6 +67,11 @@ export type MongoClientConstructorOptions = {
    * are available in most ponyfills and polyfills, including node-fetch.
    */
   fetch?: CustomFetch;
+  /**
+   * Provide a custom Headers object for the request. In some situations such as testing,
+   * this allows you to control the response from the mock server.
+   */
+  headers?: Headers;
 };
 
 /**
@@ -84,7 +89,7 @@ export class MongoClient {
   dataSource: string;
   endpoint: string;
 
-  network: CustomFetch;
+  fetch: typeof fetch;
   headers: Headers;
 
   constructor({
@@ -92,42 +97,27 @@ export class MongoClient {
     dataSource,
     endpoint,
     fetch: customFetch,
+    headers,
   }: MongoClientConstructorOptions) {
     this.dataSource = dataSource;
     this.endpoint = endpoint instanceof URL ? endpoint.toString() : endpoint;
 
-    // create fetch implementation, preferring a ponyfill, then falling back to globals
-    if (customFetch) {
-      this.network = customFetch;
-    } else {
-      this.network = {
-        fetch: globalThis.fetch,
-        Request: globalThis.Request,
-        Response: globalThis.Response,
-        Headers: globalThis.Headers,
-      };
-    }
+    this.fetch = customFetch?.fetch ?? globalThis.fetch;
+    const HeaderClass = customFetch?.Headers ?? globalThis.Headers;
 
-    // validate fetch implementation
-    if (
-      !this.network.fetch ||
-      !this.network.Request ||
-      !this.network.Response ||
-      !this.network.Headers
-    ) {
+    if (!this.fetch || !HeaderClass) {
       throw new Error(
         "No viable fetch() found. Please provide a fetch interface"
       );
     }
 
-    // create headers object for request
-    this.headers = new this.network.Headers();
+    this.headers = headers ?? new HeaderClass();
 
     this.headers.set("Content-Type", "application/ejson");
     this.headers.set("Accept", "application/ejson");
 
     if ("apiKey" in auth) {
-      this.headers.set("api-key", auth.apiKey);
+      this.headers.set("apiKey", auth.apiKey);
       return;
     }
 
@@ -139,6 +129,11 @@ export class MongoClient {
     if ("email" in auth && "password" in auth) {
       this.headers.set("email", auth.email);
       this.headers.set("password", auth.password);
+      return;
+    }
+
+    if ("bearerToken" in auth) {
+      this.headers.set("Authorization", `Bearer ${auth.bearerToken}`);
       return;
     }
 
@@ -205,18 +200,21 @@ export class Collection<TSchema = Document> {
   async findOne(
     filter?: Filter<TSchema>,
     options: { projection?: Document; sort?: Document } = {}
-  ): Promise<Nullable<WithId<TSchema>>> {
-    const result = await this.callApi("findOne", {
-      filter,
-      projection: options.projection,
-      sort: options.sort,
-    });
+  ): Promise<DataAPIResponse<Nullable<WithId<TSchema>>>> {
+    const { data, error } = await this.callApi<{ document: WithId<TSchema> }>(
+      "findOne",
+      {
+        filter,
+        projection: options.projection,
+        sort: options.sort,
+      }
+    );
 
-    if (result && typeof result === "object" && "document" in result) {
-      return result.document as WithId<TSchema>;
+    if (data) {
+      return { data: data.document ?? null, error };
     }
 
-    return null;
+    return { data, error };
   }
 
   /**
@@ -243,8 +241,10 @@ export class Collection<TSchema = Document> {
       limit?: number;
       skip?: number;
     }
-  ): Promise<WithId<TSchema>[]> {
-    const result = await this.callApi("find", {
+  ): Promise<DataAPIResponse<WithId<TSchema>[]>> {
+    const { data, error } = await this.callApi<{
+      documents: WithId<TSchema>[];
+    }>("find", {
       filter,
       projection: options?.projection,
       sort: options?.sort,
@@ -252,11 +252,11 @@ export class Collection<TSchema = Document> {
       skip: options?.skip,
     });
 
-    if (result && typeof result === "object" && "documents" in result) {
-      return result.documents as WithId<TSchema>[];
+    if (data) {
+      return { data: data.documents, error };
     }
 
-    return [];
+    return { data, error };
   }
 
   /**
@@ -427,7 +427,7 @@ export class Collection<TSchema = Document> {
     const { endpoint, dataSource, headers } = this.client;
     const url = `${endpoint}/action/${method}`;
 
-    const response = await this.client.network.fetch(url, {
+    const response = await this.client.fetch(url, {
       method: "POST",
       headers,
       body: EJSON.stringify({
@@ -438,15 +438,12 @@ export class Collection<TSchema = Document> {
       }),
     });
 
-    // interpret response code
+    // interpret response code. Log error for anything outside of 2xx 3xx
     // https://www.mongodb.com/docs/atlas/api/data-api-resources/#error-codes
-    if (
-      response.status in [400, 401, 404] ||
-      (response.status >= 500 && response.status < 600)
-    ) {
+    if (response.status < 200 || response.status >= 400) {
       let errorText: string | undefined;
       try {
-        errorText = await response.text();
+        errorText = ((await response.json()) as { error: string })?.error;
       } catch {
         // ignore failed parsing of response text
       }
@@ -460,8 +457,8 @@ export class Collection<TSchema = Document> {
 
       return {
         error: new MongoDataAPIError(
-          response.statusText ??
-            errorText ??
+          errorText ??
+            response.statusText ??
             fallbackMessage?.[response.status] ??
             "Data API Error",
           response.status

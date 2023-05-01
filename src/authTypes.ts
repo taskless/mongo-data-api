@@ -11,7 +11,12 @@ export type CustomJwtAuthOptions = {
   jwtTokenString: string;
 };
 
+export type BearerTokenAuthOptions = {
+  bearerToken: string;
+};
+
 export type AuthOptions =
   | EmailPasswordAuthOptions
   | ApiKeyAuthOptions
-  | CustomJwtAuthOptions;
+  | CustomJwtAuthOptions
+  | BearerTokenAuthOptions;

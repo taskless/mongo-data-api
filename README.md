@@ -10,6 +10,7 @@
     - [Using a Data API api key (preferred)](#using-a-data-api-api-key-preferred)
     - [Using Email and Password](#using-email-and-password)
     - [Using a custom JWT](#using-a-custom-jwt)
+    - [Using Bearer Auth (required for browser)](#using-bearer-auth-required-for-browser)
 - [Supported Methods and API](#supported-methods-and-api)
   - [Create a Mongo Client](#create-a-mongo-client)
   - [Select a Database](#select-a-database)
@@ -49,14 +50,19 @@ const mc = new MongoClient({
   },
 });
 
-await mc.findOne({
-  /* good 'ole mongo */
+const { data, error } = await mc.findOne({
+  /* good 'ole mongo! See the Collection Methods for what's available */
 });
 ```
 
 ## Authentication
 
-Authenticating to the Mongo Data API is done with either an API Key, an email/password, or via a JWT string:
+| Authentication Method | Supported |
+| :-------------------- | :-------: |
+| API Key               |    ✅     |
+| Email & Password      |    ✅     |
+| Custom JWT            |    ✅     |
+| Bearer                |    ⚠️     |
 
 ### Using a Data API api key (preferred)
 
@@ -92,6 +98,20 @@ Authenticating to the Mongo Data API is done with either an API Key, an email/pa
   auth: {
     /** @type string */
     jwtTokenString: request.headers.get("jwt"),
+  },
+}
+```
+
+### Using Bearer Auth (required for browser)
+
+_[Read more about authenticating Realm users in the browser](https://www.mongodb.com/docs/atlas/app-services/users/sessions/#std-label-manage-user-sessions)_
+
+```ts
+{
+  // ...
+  auth: {
+    /** @type string */
+    bearerToken: tokenFromRealm,
   },
 }
 ```
