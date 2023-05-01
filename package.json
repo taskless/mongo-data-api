@@ -2,7 +2,7 @@
   "name": "@taskless/mongo-data-api",
   "description": "Mongo Data API client using fetch, suitable for lambda and edge functions",
   "version": "0.0.1",
-  "author": "Jakob Heuser",
+  "author": "Jakob Heuser <taskless@codedrift.com>",
   "license": "MIT",
   "homepage": "https://github.com/taskless/mongo-data-api/",
   "repository": "taskless/mongo-data-api.git",
