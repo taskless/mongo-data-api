@@ -30,8 +30,8 @@ Older releases are available via github releases: https://github.com/taskless/mo
 
 <!-- Releases -->
 
-[unreleased]: https://github.com/taskless/mongo-data-api/compare/v0.1.2...HEAD
+[unreleased]: https://github.com/taskless/mongo-data-api/compare/0.1.2...HEAD
 
 <!-- Past Releases -->
 
-[0.1.2]: https://github.com/taskless/mongo-data-api/compare/320744af834ca94e450e2a129283e5c7500b763d...v0.1.2
+[0.1.2]: https://github.com/taskless/mongo-data-api/compare/320744af834ca94e450e2a129283e5c7500b763d...0.1.2
