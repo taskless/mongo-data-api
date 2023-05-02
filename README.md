@@ -298,7 +298,7 @@ Requests via `fetch()` have their resposne codes checked against the [Data API E
 
 # FAQ
 
-- **Why is `mongodb` in the dependencies?** The short answer is [TypeScript requires it](https://www.typescriptlang.org/docs/handbook/declaration-files/publishing.html#dependencies). The mongodb dependency is types-only and will not be included in your built lambda when using `tsc`, `rollup`, `webpack`, and other bundling tools. Unfortunately, to re-export the types, it must be included as a regular dependency instead of dev-dependency. You can verify that mongo is not included by looking at the [CommonJS build](./dist/index.cjs).
+- **Why is `mongodb` in the dependencies?** The short answer is [TypeScript requires it](https://www.typescriptlang.org/docs/handbook/declaration-files/publishing.html#dependencies). The mongodb dependency is types-only and will not be included in your built lambda when using `tsc`, `rollup`, `webpack`, and other bundling tools. Unfortunately, to re-export the types, it must be included as a regular dependency instead of dev-dependency. You can verify that mongo is not included by looking at the [CommonJS build](https://www.npmjs.com/package/@taskless/mongo-data-api?activeTab=code).
 
 # License
 
