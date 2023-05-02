@@ -78,5 +78,16 @@
   },
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "keywords": [
+    "atlas",
+    "data-api",
+    "dataapi",
+    "edge",
+    "fetch",
+    "lambda",
+    "mongo",
+    "mongodb",
+    "realm"
+  ]
 }
