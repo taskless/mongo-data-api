@@ -1,3 +1,4 @@
+import { type OutgoingHttpHeaders } from "node:http";
 import { EJSON } from "bson";
 import type {
   Sort,
@@ -24,13 +25,6 @@ export type {
   WithId,
   WithoutId,
 } from "mongodb";
-
-export type CustomFetch = {
-  fetch: typeof fetch;
-  Request: typeof Request;
-  Response: typeof Response;
-  Headers: typeof Headers;
-};
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 type Nullable<T> = T | null;
@@ -66,12 +60,12 @@ export type MongoClientConstructorOptions = {
    * a `fetch()` function, as well as the `Request`, `Response`, and `Headers` classes. These
    * are available in most ponyfills and polyfills, including node-fetch.
    */
-  fetch?: CustomFetch;
+  fetch?: typeof fetch;
   /**
    * Provide a custom Headers object for the request. In some situations such as testing,
    * this allows you to control the response from the mock server.
    */
-  headers?: Headers;
+  headers?: OutgoingHttpHeaders | Headers;
 };
 
 /**
@@ -90,7 +84,7 @@ export class MongoClient {
   endpoint: string;
 
   fetch: typeof fetch;
-  headers: Headers;
+  headers: HeadersInit;
 
   constructor({
     auth,
@@ -102,38 +96,45 @@ export class MongoClient {
     this.dataSource = dataSource;
     this.endpoint = endpoint instanceof URL ? endpoint.toString() : endpoint;
 
-    this.fetch = customFetch?.fetch ?? globalThis.fetch;
-    const HeaderClass = customFetch?.Headers ?? globalThis.Headers;
+    this.fetch = customFetch ?? globalThis.fetch;
+    this.headers = {};
 
-    if (!this.fetch || typeof this.fetch !== "function" || !HeaderClass) {
+    // accept a node-style or whatwg headers object with .keys() and .get()
+    if (typeof headers?.keys === "function") {
+      for (const key of headers.keys()) {
+        this.headers[key] = (
+          typeof headers.get === "function" ? headers.get(key) : headers[key]
+        ) as string;
+      }
+    }
+
+    if (!this.fetch || typeof this.fetch !== "function") {
       throw new Error(
         "No viable fetch() found. Please provide a fetch interface"
       );
     }
 
-    this.headers = headers ?? new HeaderClass();
-
-    this.headers.set("Content-Type", "application/ejson");
-    this.headers.set("Accept", "application/ejson");
+    this.headers["Content-Type"] = "application/ejson";
+    this.headers.Accept = "application/ejson";
 
     if ("apiKey" in auth) {
-      this.headers.set("apiKey", auth.apiKey);
+      this.headers.apiKey = auth.apiKey;
       return;
     }
 
     if ("jwtTokenString" in auth) {
-      this.headers.set("jwtTokenString", auth.jwtTokenString);
+      this.headers.jwtTokenString = auth.jwtTokenString;
       return;
     }
 
     if ("email" in auth && "password" in auth) {
-      this.headers.set("email", auth.email);
-      this.headers.set("password", auth.password);
+      this.headers.email = auth.email;
+      this.headers.password = auth.password;
       return;
     }
 
     if ("bearerToken" in auth) {
-      this.headers.set("Authorization", `Bearer ${auth.bearerToken}`);
+      this.headers.Authorization = `Bearer ${auth.bearerToken}`;
       return;
     }
 

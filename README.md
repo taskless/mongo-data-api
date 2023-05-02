@@ -128,6 +128,8 @@ const client = new MongoClient(options);
   - `options.endpoint` - `string | URL` an endpoint for sending requests to. Your Data API Endpoint is available at your Mongo Data API UI `https://cloud.mongodb.com/v2/<projectId>#/dataAPI`, where `<projectId>` is your project ID. A single Data API is usable for the entire project, with individual data sources routing to specific atlas instances.
   - `options.dataSource` - `string` the `Data Source` for your Data API. On the Data API UI, this is the "Data Source" column, and usually is either a 1:1 mapping of your cluster name, or the default `mongodb-atlas` if you enabled Data API through the Atlas Admin UI.
   - `options.auth` - `AuthOptions` one of the authentication methods, either api key, email & password, or a custom JWT string. At this time, only [Credential Authentication](https://www.mongodb.com/docs/atlas/api/data-api/#credential-authentication) is supported.
+  - `options.fetch?` - A custom `fetch` function conforming to the [native fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API). We recommend [cross-fetch](https://www.npmjs.com/package/cross-fetch), as it asserts a complaint `fetch()` interface and avoids you having to do `fetch: _fetch as typeof fetch` to satisfy the TypeScript compiler
+  - `options.headers?` - Additional [Headers](https://developer.mozilla.org/en-US/docs/Web/API/Headers) to include with the request. May also be a simple object of key/value pairs.
 
 ## Select a Database
 

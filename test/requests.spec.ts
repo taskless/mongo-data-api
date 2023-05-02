@@ -1,5 +1,5 @@
 import anyTest, { type TestFn, type ExecutionContext } from "ava";
-import fetch, { Request, Response, Headers } from "cross-fetch";
+import fetch, { Headers } from "cross-fetch";
 import { type RequestHandler } from "msw";
 import { MongoClient, ObjectId } from "../src/client.js";
 import { MongoDataAPIError } from "../src/errors.js";
@@ -38,12 +38,7 @@ const createMongoClient = (headers?: Headers) => {
     endpoint: BASE_URL,
     dataSource: "test-datasource",
     auth: { apiKey: "validApiKey" },
-    fetch: {
-      fetch,
-      Request,
-      Response,
-      Headers,
-    },
+    fetch,
     headers,
   });
   return c;
@@ -222,12 +217,7 @@ test("auth: disabled data source results in 400 from Mongo", async (t) => {
     endpoint: BASE_URL,
     dataSource: "test-datasource-disabled",
     auth: { apiKey: "validApiKey" },
-    fetch: {
-      fetch,
-      Request,
-      Response,
-      Headers,
-    },
+    fetch,
   });
   const { data, error } = await c
     .db("test-db")
@@ -245,12 +235,7 @@ test("auth: bad auth results in 401 from Mongo", async (t) => {
     endpoint: BASE_URL,
     dataSource: "test-datasource",
     auth: { apiKey: "inValidApiKey" },
-    fetch: {
-      fetch,
-      Request,
-      Response,
-      Headers,
-    },
+    fetch,
   });
   const { data, error } = await c
     .db("test-db")
@@ -269,12 +254,7 @@ test("auth: bad client ID results in 404 from Mongo", async (t) => {
       "https://data.mongodb-api.com/app/invalidClientAppId/endpoint/data/v1",
     dataSource: "test-datasource",
     auth: { apiKey: "validApiKey" },
-    fetch: {
-      fetch,
-      Request,
-      Response,
-      Headers,
-    },
+    fetch,
   });
   const { data, error } = await c
     .db("test-db")

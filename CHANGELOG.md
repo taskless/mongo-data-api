@@ -7,12 +7,17 @@ All notable changes to this project will be documented in this file. This projec
 ### Added
 
 - Created a `CHANGELOG.md` for changelog tracking
+- Enabled support for plain JS objects in `headers`
 
 ### Fixed
 
 ### Changed
 
+- Removed requirement for `Request` and `Response` in the custom fetch interface
+
 ### Removed
+
+- Dropped `node-fetch` for `cross-fetch` in tests to minimze type assertions
 
 ## [0.1.2] - 2023-05-01
 
