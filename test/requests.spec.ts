@@ -255,7 +255,7 @@ test("auth: bad auth results in 401 from Mongo", async (t) => {
   const { data, error } = await c
     .db("test-db")
     .collection<TestDocument>("test-collection")
-    .findOne({ _id: new ObjectId("6193504e1be4ab27791c8133") });
+    .find({ _id: new ObjectId("6193504e1be4ab27791c8133") });
 
   t.is(data, undefined);
   t.truthy(error instanceof MongoDataAPIError);

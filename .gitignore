@@ -15,3 +15,6 @@ archive/
 .DS_Code
 *.Identifier
 node_modules
+
+# https://github.com/avajs/ava/blob/main/docs/recipes/code-coverage.md
+coverage

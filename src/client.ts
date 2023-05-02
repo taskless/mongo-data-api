@@ -105,7 +105,7 @@ export class MongoClient {
     this.fetch = customFetch?.fetch ?? globalThis.fetch;
     const HeaderClass = customFetch?.Headers ?? globalThis.Headers;
 
-    if (!this.fetch || !HeaderClass) {
+    if (!this.fetch || typeof this.fetch !== "function" || !HeaderClass) {
       throw new Error(
         "No viable fetch() found. Please provide a fetch interface"
       );
@@ -445,7 +445,7 @@ export class Collection<TSchema = Document> {
       try {
         errorText = ((await response.json()) as { error: string })?.error;
       } catch {
-        // ignore failed parsing of response text
+        /* c8 ignore next */
       }
 
       const fallbackMessage = {
