@@ -14,6 +14,12 @@ All notable changes to this project will be documented in this file. This projec
 
 ### Removed
 
+## [0.2.1] - 2023-05-02
+
+### Fixed
+
+- Updated typescript documentation for `fetch?`
+
 ## [0.2.0] - 2023-05-02
 
 ### Breaking Changes

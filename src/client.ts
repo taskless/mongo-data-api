@@ -56,9 +56,7 @@ export type MongoClientConstructorOptions = {
    */
   auth: AuthOptions;
   /**
-   * Provide a compatibility layer with a custom fetch implementation. You'll need to supply
-   * a `fetch()` function, as well as the `Request`, `Response`, and `Headers` classes. These
-   * are available in most ponyfills and polyfills, including node-fetch.
+   * Provide a compatibility layer with a custom fetch implementation.
    */
   fetch?: typeof fetch;
   /**
