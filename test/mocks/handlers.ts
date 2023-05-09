@@ -117,6 +117,19 @@ function first<T>(value: T | T[] | readonly T[]) {
   return asArray(value)[0];
 }
 
+const cannotBeNull: Record<string, string[]> = {
+  find: ["filter", "projection"],
+  findOne: ["filter", "projection", "sort", "limit", "skip"],
+  insertOne: [],
+  insertMany: [],
+  updateOne: ["upsert"],
+  updateMany: ["upsert"],
+  replaceOne: ["upsert"],
+  deleteOne: [],
+  deleteMany: [],
+  aggregate: [],
+};
+
 export const handlers = [
   rest.post(`${BASE_URL}/action/:action`, async (request, response, ctx) => {
     const body: {
@@ -156,6 +169,15 @@ export const handlers = [
         ctx.status(Number(forceError)),
         ctx.json(errors[forceError])
       );
+    }
+
+    // attempting to pass "null" for an optional top level field results in a 400 from mongo
+    const nonNullables =
+      cannotBeNull[request.params.action as keyof typeof cannotBeNull] ?? [];
+    for (const key of nonNullables) {
+      if (body[key] === null) {
+        return response(ctx.status(400), ctx.json({ error: "Bad Request" }));
+      }
     }
 
     // find payload for use case

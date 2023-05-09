@@ -67,6 +67,15 @@ export type MongoClientConstructorOptions = {
 };
 
 /**
+ * Removes empty keys from an object at the top level. EJSON.stringify does not drop
+ * undefined values in serialization, so we need to explicitly remove any keys with
+ * null/undefined without recursing further into the object.
+ */
+const removeEmptyKeys = (object: Record<string, unknown>) => {
+  return Object.fromEntries(Object.entries(object).filter(([_, v]) => v));
+};
+
+/**
  * Create a MongoDB-like client for communicating with the Atlas Data API
  *
  * ref: https://www.mongodb.com/docs/atlas/api/data-api-resources/
@@ -433,7 +442,7 @@ export class Collection<TSchema = Document> {
         collection: this.name,
         database: this.database.name,
         dataSource,
-        ...body,
+        ...removeEmptyKeys(body),
       }),
     });
 
