@@ -14,6 +14,12 @@ All notable changes to this project will be documented in this file. This projec
 
 ### Removed
 
+## [0.2.2]
+
+### Fixed
+
+- `undefined` values in top level fields (sort, projection, etc) cause `400` from mongo #1
+
 ## [0.2.1] - 2023-05-02
 
 ### Fixed
@@ -79,7 +85,9 @@ Older releases are available via github releases: https://github.com/taskless/mo
 
 <!-- Releases -->
 
-[unreleased]: https://github.com/taskless/mongo-data-api/compare/0.1.2...HEAD
+[unreleased]: https://github.com/taskless/mongo-data-api/compare/0.2.2...HEAD
+[0.2.2]: https://github.com/taskless/mongo-data-api/compare/0.2.1...0.2.2
+[0.2.1]: https://github.com/taskless/mongo-data-api/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/taskless/mongo-data-api/compare/0.1.2...0.2.0
 [0.1.2]: https://github.com/taskless/mongo-data-api/compare/320744af834ca94e450e2a129283e5c7500b763d...0.1.2
 
