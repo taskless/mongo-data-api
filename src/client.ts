@@ -1,5 +1,5 @@
 import { type OutgoingHttpHeaders } from "node:http";
-import { EJSON } from "bson";
+import { EJSON, type ObjectId } from "bson";
 import type {
   Sort,
   Filter,
@@ -275,7 +275,7 @@ export class Collection<TSchema = Document> {
    */
   async insertOne(
     document: OptionalUnlessRequiredId<TSchema>
-  ): Promise<DataAPIResponse<{ insertedId: string }>> {
+  ): Promise<DataAPIResponse<{ insertedId: ObjectId }>> {
     return this.callApi("insertOne", {
       document,
     });
