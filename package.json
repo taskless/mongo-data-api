@@ -19,8 +19,7 @@
       "src/index.ts"
     ],
     "format": [
-      "esm",
-      "cjs"
+      "esm"
     ],
     "splitting": false,
     "sourcemap": true,
@@ -29,14 +28,14 @@
     "minify": false
   },
   "type": "module",
-  "main": "dist/index.cjs",
+  "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "require": null
     }
   },
   "files": [
@@ -46,12 +45,13 @@
     "src"
   ],
   "engines": {
-    "node": ">=14.19.0",
+    "node": ">=18.0.0",
     "pnpm": "8.x"
   },
   "dependencies": {
     "bson": "^6.2.0",
     "mongodb": "^6.2.0",
+    "p-retry": "^6.1.0",
     "tslib": "^2.6.2"
   },
   "devDependencies": {

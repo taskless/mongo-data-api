@@ -9,6 +9,7 @@ import type {
   WithoutId,
   Document,
 } from "mongodb";
+import pRetry from "p-retry";
 import type { AuthOptions } from "./authTypes.js";
 import { MongoDataAPIError } from "./errors.js";
 
@@ -435,16 +436,26 @@ export class Collection<TSchema = Document> {
     const { endpoint, dataSource, headers } = this.client;
     const url = `${endpoint}/action/${method}`;
 
-    const response = await this.client.fetch(url, {
-      method: "POST",
-      headers,
-      body: EJSON.stringify({
-        collection: this.name,
-        database: this.database.name,
-        dataSource,
-        ...removeEmptyKeys(body),
-      }),
-    });
+    const response = await pRetry(
+      async () => {
+        const r = await this.client.fetch(url, {
+          method: "POST",
+          headers,
+          body: EJSON.stringify({
+            collection: this.name,
+            database: this.database.name,
+            dataSource,
+            ...removeEmptyKeys(body),
+          }),
+        });
+
+        return r;
+      },
+      {
+        minTimeout: 10,
+        maxTimeout: 1000,
+      }
+    );
 
     // interpret response code. Log error for anything outside of 2xx 3xx
     // https://www.mongodb.com/docs/atlas/api/data-api-resources/#error-codes
