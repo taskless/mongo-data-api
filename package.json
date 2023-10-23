@@ -10,9 +10,9 @@
     "build": "tsup",
     "clean": "shx rm -rf dist",
     "prepare": "husky install",
+    "rel": "release-it",
     "test": "c8 ava",
-    "typecheck": "tsc --noEmit",
-    "yeet": "release-it"
+    "typecheck": "tsc --noEmit"
   },
   "tsup": {
     "entry": [
