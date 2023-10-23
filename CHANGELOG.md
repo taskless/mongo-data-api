@@ -14,6 +14,36 @@ All notable changes to this project will be documented in this file. This projec
 
 ### Removed
 
+## [0.3.0]
+
+### Breaking Changes
+
+- Updated minimum node version to `>=18.0.0`
+- Package is now ESM-only. One major reason for this change is that TypeScript now understands ESM importing naturally, making it easy to use this package in TypeScript projects without any additional configuration. If you are using CommonJS, you will need to use a bundler such as Webpack or Rollup to use this package, or import the library dynamically using `await import("mongo-data-api")`. The following snippet will provide support for importing your module safely in CommonJS.
+
+```ts
+let mongoDataApiClient: MongoClient | undefined;
+const createMongoClient = async () => {
+  if (mongoDataApiClient) return mongoDataApiClient;
+
+  const { MongoClient } = await import("mongo-data-api");
+  mongoDataApiClient = new MongoClient(/*options*/);
+  return mongoDataApiClient;
+};
+```
+
+### Added
+
+- Smart retries via `p-retry` for hard failures such as `ECONNRESET` and `ECONNREFUSED`
+
+### Fixed
+
+- Return type on `insertOne` is now of type `ObjectId` instead of `string`
+
+### Changed
+
+### Removed
+
 ## [0.2.2]
 
 ### Fixed
