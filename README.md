@@ -3,6 +3,13 @@
   <sub><i>Mongo Client for an HTTPS World. Lambda and edge function friendly</i></sub>
 </h1>
 
+<!-- Shields -->
+<a href="https://www.npmjs.com/package/@taskless/mongo-data-api"><img alt="npm" src="https://img.shields.io/npm/v/%40taskless/mongo-data-api"></a>&nbsp;
+<a href="https://www.npmjs.com/package/@taskless/mongo-data-api"><img alt="npm" src="https://img.shields.io/npm/dm/%40taskless/mongo-data-api"></a>&nbsp;
+<a href="https://github.com/taskless/mongo-data-api"><img alt="GitHub issues" src="https://img.shields.io/github/issues/taskless/mongo-data-api"></a>&nbsp;
+<a href="https://github.com/taskless/mongo-data-api"><img alt="GitHub" src="https://img.shields.io/github/license/taskless/mongo-data-api"></a>&nbsp;
+
+
 > A Mongo-like API for accessing the http-based [Mongo Data API](https://www.mongodb.com/docs/atlas/api/data-api/). Uses [BSON](https://www.npmjs.com/package/bson) to provide access to standard Mongo data types. BYO `fetch()` for maximum portability.
 
 - [Usage](#usage)
