@@ -15,6 +15,7 @@
   - [Create a Mongo Client](#create-a-mongo-client)
   - [Select a Database](#select-a-database)
   - [Select a Collection](#select-a-collection)
+  - [Changing `fetch()` on the Fly](#changing-fetch-on-the-fly)
   - [Collection Methods](#collection-methods)
     - [Return Type](#return-type)
     - [Methods](#methods)
@@ -147,6 +148,15 @@ const collection = db.collection<TSchema>(collectionName);
 
 - `collectionName` - `string` the name of the collection to connect to
 - `<TSchema>` - _generic_ A Type or Interface that describes the documents in this collection. Defaults to the generic MongoDB `Document` type
+
+## Changing `fetch()` on the Fly
+
+```ts
+const altDb = db.fetch(altFetch);
+const altCollection = db.collection<TSchema>(collectionName).fetch(altFetch);
+```
+
+- `altFetch` - An alternate `fetch` implementation that will be used for that point forward. Useful for adding or removing retry support on a per-call level, changing the authentication required, or other fetch middleware operations.
 
 ## Collection Methods
 
@@ -302,6 +312,7 @@ Requests via `fetch()` have their resposne codes checked against the [Data API E
 
 - **Why is `mongodb` in the dependencies?** [TypeScript requires it](https://www.typescriptlang.org/docs/handbook/declaration-files/publishing.html#dependencies), however, the mongodb dependency is types-only and will not be included in your built lambda when using `tsc`, `rollup`, `webpack`, etc. You can verify that mongo is not included by looking at the [CommonJS build](https://www.npmjs.com/package/@taskless/mongo-data-api?activeTab=code).
 - **Why is `node-fetch`'s `fetch` not of the correct type?** `node-fetch`'s `fetch` isn't a true `fetch` and wasn't typed as one. To work around this, you can either use [`cross-fetch`](https://github.com/lquixada/cross-fetch) which types the `fetch` API through a type assertion, or [perform the type assertion yourself](https://github.com/lquixada/cross-fetch/blob/main/index.d.ts): `fetch: _fetch as typeof fetch`. It's not ideal, but with proper `fetch` coming to node.js, it's a small inconvienence in the short term.
+- **How do I retry failed `fetch` calls?** `fetch-retry` ([github](https://github.com/jonbern/fetch-retry)) is an excellent library. You can also use a lower level retry tool like `p-retry` ([github](https://github.com/sindresorhus/p-retry)) if you want to manage more than just the `fetch()` operation itself.
 
 # License
 

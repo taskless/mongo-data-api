@@ -14,6 +14,16 @@ All notable changes to this project will be documented in this file. This projec
 
 ### Removed
 
+## [0.4.0]
+
+### Added
+
+- Custom fetch: For `db()` and `collection()`, there is now a chainable `fetch()` method, which returns a new DB or collection with its `fetch` implementation changed. This allows you to implement your own custom logic for retries, without the addition of pRetry
+
+### Removed
+
+- Removed pRetry dependency in favor of users overriding via their own fetch function
+
 ## [0.3.0]
 
 ### Breaking Changes
@@ -39,10 +49,6 @@ const createMongoClient = async () => {
 ### Fixed
 
 - Return type on `insertOne` is now of type `ObjectId` instead of `string`
-
-### Changed
-
-### Removed
 
 ## [0.2.2]
 
@@ -115,7 +121,8 @@ Older releases are available via github releases: https://github.com/taskless/mo
 
 <!-- Releases -->
 
-[unreleased]: https://github.com/taskless/mongo-data-api/compare/0.3.0...HEAD
+[unreleased]: https://github.com/taskless/mongo-data-api/compare/0.4.0...HEAD
+[0.4.0]: https://github.com/taskless/mongo-data-api/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/taskless/mongo-data-api/compare/0.2.2...0.3.0
 [0.2.2]: https://github.com/taskless/mongo-data-api/compare/0.2.1...0.2.2
 [0.2.1]: https://github.com/taskless/mongo-data-api/compare/0.2.0...0.2.1

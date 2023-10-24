@@ -41,6 +41,7 @@ const createMongoClient = (headers?: Headers) => {
     fetch,
     headers,
   });
+
   return c;
 };
 

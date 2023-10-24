@@ -9,7 +9,6 @@ import type {
   WithoutId,
   Document,
 } from "mongodb";
-import pRetry from "p-retry";
 import type { AuthOptions } from "./authTypes.js";
 import { MongoDataAPIError } from "./errors.js";
 
@@ -67,6 +66,20 @@ export type MongoClientConstructorOptions = {
   headers?: OutgoingHttpHeaders | Headers;
 };
 
+type ConnectionOptions = {
+  dataSource: string;
+  endpoint: string;
+  headers: Record<string, string>;
+};
+
+type ConnectionOptionsWithDatabase = ConnectionOptions & {
+  database: string;
+};
+
+type ConnectionOptionsWithCollection = ConnectionOptionsWithDatabase & {
+  collection: string;
+};
+
 /**
  * Removes empty keys from an object at the top level. EJSON.stringify does not drop
  * undefined values in serialization, so we need to explicitly remove any keys with
@@ -88,61 +101,61 @@ const removeEmptyKeys = (object: Record<string, unknown>) => {
  * requests, converting mongo-style BSON to JSON and back again.
  */
 export class MongoClient {
-  dataSource: string;
-  endpoint: string;
-
-  fetch: typeof fetch;
-  headers: HeadersInit;
+  protected connection: ConnectionOptions;
+  protected ftch: typeof fetch;
 
   constructor({
     auth,
     dataSource,
     endpoint,
     fetch: customFetch,
-    headers,
+    headers: h,
   }: MongoClientConstructorOptions) {
-    this.dataSource = dataSource;
-    this.endpoint = endpoint instanceof URL ? endpoint.toString() : endpoint;
-
-    this.fetch = customFetch ?? globalThis.fetch;
-    this.headers = {};
+    this.ftch = customFetch ?? globalThis.fetch;
+    const headers: HeadersInit = {};
 
     // accept a node-style or whatwg headers object with .keys() and .get()
-    if (typeof headers?.keys === "function") {
-      for (const key of headers.keys()) {
-        this.headers[key] = (
-          typeof headers.get === "function" ? headers.get(key) : headers[key]
-        ) as string;
+    if (typeof h?.keys === "function") {
+      for (const key of h.keys()) {
+        headers[key] = (
+          typeof h.get === "function" ? h.get(key) : headers[key]
+        )!;
       }
     }
 
-    if (!this.fetch || typeof this.fetch !== "function") {
+    this.connection = {
+      dataSource,
+      endpoint: endpoint instanceof URL ? endpoint.toString() : endpoint,
+      headers,
+    };
+
+    if (!this.ftch || typeof this.ftch !== "function") {
       throw new Error(
         "No viable fetch() found. Please provide a fetch interface"
       );
     }
 
-    this.headers["Content-Type"] = "application/ejson";
-    this.headers.Accept = "application/ejson";
+    this.connection.headers["Content-Type"] = "application/ejson";
+    this.connection.headers.Accept = "application/ejson";
 
     if ("apiKey" in auth) {
-      this.headers.apiKey = auth.apiKey;
+      this.connection.headers.apiKey = auth.apiKey;
       return;
     }
 
     if ("jwtTokenString" in auth) {
-      this.headers.jwtTokenString = auth.jwtTokenString;
+      this.connection.headers.jwtTokenString = auth.jwtTokenString;
       return;
     }
 
     if ("email" in auth && "password" in auth) {
-      this.headers.email = auth.email;
-      this.headers.password = auth.password;
+      this.connection.headers.email = auth.email;
+      this.connection.headers.password = auth.password;
       return;
     }
 
     if ("bearerToken" in auth) {
-      this.headers.Authorization = `Bearer ${auth.bearerToken}`;
+      this.connection.headers.Authorization = `Bearer ${auth.bearerToken}`;
       return;
     }
 
@@ -151,7 +164,7 @@ export class MongoClient {
 
   /** Select a database from within the data source */
   db(name: string) {
-    return new Database(name, this);
+    return new Database(name, this.connection, this.ftch);
   }
 }
 
@@ -161,12 +174,19 @@ export class MongoClient {
  * queries.
  */
 export class Database {
-  name: string;
-  client: MongoClient;
+  protected connection: ConnectionOptionsWithDatabase;
+  protected ftch: typeof fetch;
 
-  constructor(name: string, client: MongoClient) {
-    this.name = name;
-    this.client = client;
+  constructor(
+    name: string,
+    connection: ConnectionOptions,
+    customFetch?: typeof fetch
+  ) {
+    this.ftch = customFetch ?? globalThis.fetch;
+    this.connection = {
+      ...connection,
+      database: name,
+    };
   }
 
   /**
@@ -176,7 +196,21 @@ export class Database {
    * @returns A Collection object of type `T`
    */
   collection<TSchema = Document>(name: string) {
-    return new Collection<TSchema>(name, this);
+    return new Collection<TSchema>(name, this.connection, this.ftch);
+  }
+
+  /**
+   * Change the fetch interface for this database. Returns a new Database object
+   * @param customFetch A fetch interface to use for subsequent calls
+   * @returns A new Database object with the custom fetch interface implemented
+   */
+  fetch(customFetch: typeof fetch) {
+    const db = new Database(
+      this.connection.database,
+      this.connection,
+      customFetch
+    );
+    return db;
   }
 }
 
@@ -185,14 +219,33 @@ export class Database {
  * methods in a fluent interface.
  */
 export class Collection<TSchema = Document> {
-  name: string;
-  database: Database;
-  client: MongoClient;
+  protected connection: ConnectionOptionsWithCollection;
+  protected ftch: typeof fetch;
 
-  constructor(name: string, database: Database) {
-    this.name = name;
-    this.database = database;
-    this.client = database.client;
+  constructor(
+    name: string,
+    database: ConnectionOptionsWithDatabase,
+    customFetch?: typeof fetch
+  ) {
+    this.ftch = customFetch ?? globalThis.fetch;
+    this.connection = {
+      ...database,
+      collection: name,
+    };
+  }
+
+  /**
+   * Change the fetch interface for this collection. Returns a new Collection object
+   * @param customFetch A fetch interface to use for subsequent calls
+   * @returns A new Collection object with the custom fetch interface implemented
+   */
+  fetch(customFetch: typeof fetch) {
+    const collection = new Collection(
+      this.connection.collection,
+      this.connection,
+      customFetch
+    );
+    return collection;
   }
 
   /**
@@ -433,29 +486,20 @@ export class Collection<TSchema = Document> {
     method: string,
     body: Record<string, unknown>
   ): Promise<DataAPIResponse<T>> {
-    const { endpoint, dataSource, headers } = this.client;
+    const { endpoint, dataSource, headers, collection, database } =
+      this.connection;
     const url = `${endpoint}/action/${method}`;
 
-    const response = await pRetry(
-      async () => {
-        const r = await this.client.fetch(url, {
-          method: "POST",
-          headers,
-          body: EJSON.stringify({
-            collection: this.name,
-            database: this.database.name,
-            dataSource,
-            ...removeEmptyKeys(body),
-          }),
-        });
-
-        return r;
-      },
-      {
-        minTimeout: 10,
-        maxTimeout: 1000,
-      }
-    );
+    const response = await this.ftch(url, {
+      method: "POST",
+      headers,
+      body: EJSON.stringify({
+        collection,
+        database,
+        dataSource,
+        ...removeEmptyKeys(body),
+      }),
+    });
 
     // interpret response code. Log error for anything outside of 2xx 3xx
     // https://www.mongodb.com/docs/atlas/api/data-api-resources/#error-codes
