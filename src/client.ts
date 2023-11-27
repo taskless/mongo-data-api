@@ -261,14 +261,14 @@ export class Collection<TSchema = Document> {
    */
   async findOne(
     filter?: Filter<TSchema>,
-    options: { projection?: Document; sort?: Document } = {}
+    options?: { projection?: Document; sort?: Document }
   ): Promise<DataAPIResponse<Nullable<WithId<TSchema>>>> {
     const { data, error } = await this.callApi<{ document: WithId<TSchema> }>(
       "findOne",
       {
         filter,
-        projection: options.projection,
-        sort: options.sort,
+        projection: options?.projection,
+        sort: options?.sort,
       }
     );
 
@@ -360,7 +360,7 @@ export class Collection<TSchema = Document> {
   async updateOne(
     filter: Filter<TSchema>,
     update: UpdateFilter<TSchema> | Partial<TSchema>,
-    options: { upsert?: boolean } = {}
+    options?: { upsert?: boolean }
   ): Promise<
     DataAPIResponse<{
       matchedCount: number;
@@ -371,7 +371,7 @@ export class Collection<TSchema = Document> {
     return this.callApi("updateOne", {
       filter,
       update,
-      upsert: options.upsert,
+      upsert: options?.upsert,
     });
   }
 
@@ -390,7 +390,7 @@ export class Collection<TSchema = Document> {
   async updateMany(
     filter: Filter<TSchema>,
     update: UpdateFilter<TSchema>,
-    { upsert }: { upsert?: boolean } = {}
+    options?: { upsert?: boolean }
   ): Promise<
     DataAPIResponse<{
       matchedCount: number;
@@ -401,7 +401,7 @@ export class Collection<TSchema = Document> {
     return this.callApi("updateMany", {
       filter,
       update,
-      upsert,
+      upsert: options?.upsert,
     });
   }
 
@@ -420,7 +420,7 @@ export class Collection<TSchema = Document> {
   async replaceOne(
     filter: Filter<TSchema>,
     replacement: WithoutId<TSchema>,
-    options: { upsert?: boolean } = {}
+    options?: { upsert?: boolean }
   ): Promise<
     DataAPIResponse<{
       matchedCount: number;
@@ -431,7 +431,7 @@ export class Collection<TSchema = Document> {
     return this.callApi("replaceOne", {
       filter,
       replacement,
-      upsert: options.upsert,
+      upsert: options?.upsert,
     });
   }
 
