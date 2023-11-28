@@ -1,7 +1,5 @@
-import { type OutgoingHttpHeaders } from "node:http";
-import { EJSON, type ObjectId } from "bson";
+import { EJSON } from "bson";
 import type {
-  Sort,
   Filter,
   OptionalUnlessRequiredId,
   UpdateFilter,
@@ -11,8 +9,26 @@ import type {
 } from "mongodb";
 import type { AuthOptions } from "./authTypes.js";
 import { MongoDataAPIError } from "./errors.js";
+import {
+  type AggregateResponse,
+  type DataAPIResponse,
+  type DeleteManyResponse,
+  type DeleteOneResponse,
+  type FindOneRequestOptions,
+  type FindOneResponse,
+  type FindRequestOptions,
+  type FindResponse,
+  type InsertManyResponse,
+  type InsertOneResponse,
+  type ReplaceOneRequestOptions,
+  type ReplaceOneResponse,
+  type UpdateManyRequestOptions,
+  type UpdateManyResponse,
+  type UpdateOneRequestOptions,
+  type UpdateOneResponse,
+} from "./responseTypes.js";
 
-// reexport bson types
+// reexport bson objects that make working with mongo-data-api easier
 export { EJSON, ObjectId } from "bson";
 
 // reexport relevant mongo types
@@ -26,13 +42,11 @@ export type {
   WithoutId,
 } from "mongodb";
 
-// eslint-disable-next-line @typescript-eslint/ban-types
-type Nullable<T> = T | null;
-
-/** A data API response object */
-type DataAPIResponse<T> = { data?: T; error?: MongoDataAPIError };
-
-export type MongoClientConstructorOptions = {
+/**
+ * Defines a set of options that affect the request to make to the Atlas Data API. All
+ * fields are optional, but must eventually be resolved by the time you execute a query.
+ */
+export type RequestOptions = {
   /**
    * Your atlas endpoint. Usually in the form of
    * https://data.mongodb-api.com/app/<clientAppId>/endpoint/data/v1
@@ -54,28 +68,33 @@ export type MongoClientConstructorOptions = {
    *
    * Read more: https://www.mongodb.com/docs/atlas/api/data-api/#authenticate-requests
    */
-  auth: AuthOptions;
+  auth?: AuthOptions;
   /**
    * Provide a compatibility layer with a custom fetch implementation.
    */
   fetch?: typeof fetch;
-  /**
-   * Provide a custom Headers object for the request. In some situations such as testing,
-   * this allows you to control the response from the mock server.
-   */
-  headers?: OutgoingHttpHeaders | Headers;
 };
 
+/** Options passed to the callAPI method */
+type callAPIOptions = {
+  /** Convienence property for setting the x-realm-op-name header */
+  operationName?: string;
+};
+
+/** Describes a set of resolved connection options, with a normalized headers object and fetch method */
 type ConnectionOptions = {
-  dataSource: string;
-  endpoint: string;
+  dataSource?: string;
+  endpoint?: string;
   headers: Record<string, string>;
+  fetch: typeof fetch;
 };
 
+/** Extends the ConnectionOptions to add a database field */
 type ConnectionOptionsWithDatabase = ConnectionOptions & {
   database: string;
 };
 
+/** Extends the ConnectionsOptionsWithDatabase to add a collection name */
 type ConnectionOptionsWithCollection = ConnectionOptionsWithDatabase & {
   collection: string;
 };
@@ -87,6 +106,39 @@ type ConnectionOptionsWithCollection = ConnectionOptionsWithDatabase & {
  */
 const removeEmptyKeys = (object: Record<string, unknown>) => {
   return Object.fromEntries(Object.entries(object).filter(([_, v]) => v));
+};
+
+/** Converts a set of request options into connection options */
+const normalizeRequestOptions = (
+  options?: RequestOptions
+): ConnectionOptions => {
+  const { endpoint, dataSource, auth, fetch: customFetch } = options ?? {};
+  const ftch = customFetch ?? globalThis.fetch;
+
+  const connection: ConnectionOptions = {
+    dataSource,
+    endpoint: endpoint instanceof URL ? endpoint.toString() : endpoint,
+    headers: {},
+    fetch: ftch,
+  };
+
+  // if auth is defined, it must be checked before being added to headers
+  if (auth) {
+    if ("apiKey" in auth) {
+      connection.headers.apiKey = auth.apiKey;
+    } else if ("jwtTokenString" in auth) {
+      connection.headers.jwtTokenString = auth.jwtTokenString;
+    } else if ("email" in auth && "password" in auth) {
+      connection.headers.email = auth.email;
+      connection.headers.password = auth.password;
+    } else if ("bearerToken" in auth) {
+      connection.headers.Authorization = `Bearer ${auth.bearerToken}`;
+    } else {
+      throw new Error("Invalid auth options");
+    }
+  }
+
+  return connection;
 };
 
 /**
@@ -102,69 +154,14 @@ const removeEmptyKeys = (object: Record<string, unknown>) => {
  */
 export class MongoClient {
   protected connection: ConnectionOptions;
-  protected ftch: typeof fetch;
 
-  constructor({
-    auth,
-    dataSource,
-    endpoint,
-    fetch: customFetch,
-    headers: h,
-  }: MongoClientConstructorOptions) {
-    this.ftch = customFetch ?? globalThis.fetch;
-    const headers: HeadersInit = {};
-
-    // accept a node-style or whatwg headers object with .keys() and .get()
-    if (typeof h?.keys === "function") {
-      for (const key of h.keys()) {
-        headers[key] = (
-          typeof h.get === "function" ? h.get(key) : headers[key]
-        )!;
-      }
-    }
-
-    this.connection = {
-      dataSource,
-      endpoint: endpoint instanceof URL ? endpoint.toString() : endpoint,
-      headers,
-    };
-
-    if (!this.ftch || typeof this.ftch !== "function") {
-      throw new Error(
-        "No viable fetch() found. Please provide a fetch interface"
-      );
-    }
-
-    this.connection.headers["Content-Type"] = "application/ejson";
-    this.connection.headers.Accept = "application/ejson";
-
-    if ("apiKey" in auth) {
-      this.connection.headers.apiKey = auth.apiKey;
-      return;
-    }
-
-    if ("jwtTokenString" in auth) {
-      this.connection.headers.jwtTokenString = auth.jwtTokenString;
-      return;
-    }
-
-    if ("email" in auth && "password" in auth) {
-      this.connection.headers.email = auth.email;
-      this.connection.headers.password = auth.password;
-      return;
-    }
-
-    if ("bearerToken" in auth) {
-      this.connection.headers.Authorization = `Bearer ${auth.bearerToken}`;
-      return;
-    }
-
-    throw new Error("Invalid auth options");
+  constructor(options: RequestOptions) {
+    this.connection = normalizeRequestOptions(options);
   }
 
   /** Select a database from within the data source */
   db(name: string) {
-    return new Database(name, this.connection, this.ftch);
+    return new Database(name, this.connection);
   }
 }
 
@@ -175,14 +172,8 @@ export class MongoClient {
  */
 export class Database {
   protected connection: ConnectionOptionsWithDatabase;
-  protected ftch: typeof fetch;
 
-  constructor(
-    name: string,
-    connection: ConnectionOptions,
-    customFetch?: typeof fetch
-  ) {
-    this.ftch = customFetch ?? globalThis.fetch;
+  constructor(name: string, connection: ConnectionOptions) {
     this.connection = {
       ...connection,
       database: name,
@@ -196,21 +187,7 @@ export class Database {
    * @returns A Collection object of type `T`
    */
   collection<TSchema = Document>(name: string) {
-    return new Collection<TSchema>(name, this.connection, this.ftch);
-  }
-
-  /**
-   * Change the fetch interface for this database. Returns a new Database object
-   * @param customFetch A fetch interface to use for subsequent calls
-   * @returns A new Database object with the custom fetch interface implemented
-   */
-  fetch(customFetch: typeof fetch) {
-    const db = new Database(
-      this.connection.database,
-      this.connection,
-      customFetch
-    );
-    return db;
+    return new Collection<TSchema>(name, this.connection);
   }
 }
 
@@ -220,32 +197,12 @@ export class Database {
  */
 export class Collection<TSchema = Document> {
   protected connection: ConnectionOptionsWithCollection;
-  protected ftch: typeof fetch;
 
-  constructor(
-    name: string,
-    database: ConnectionOptionsWithDatabase,
-    customFetch?: typeof fetch
-  ) {
-    this.ftch = customFetch ?? globalThis.fetch;
+  constructor(name: string, database: ConnectionOptionsWithDatabase) {
     this.connection = {
       ...database,
       collection: name,
     };
-  }
-
-  /**
-   * Change the fetch interface for this collection. Returns a new Collection object
-   * @param customFetch A fetch interface to use for subsequent calls
-   * @returns A new Collection object with the custom fetch interface implemented
-   */
-  fetch(customFetch: typeof fetch) {
-    const collection = new Collection(
-      this.connection.collection,
-      this.connection,
-      customFetch
-    );
-    return collection;
   }
 
   /**
@@ -260,16 +217,27 @@ export class Collection<TSchema = Document> {
    * @returns A matching document, or `null` if no document is found
    */
   async findOne(
+    operationName: string,
     filter?: Filter<TSchema>,
-    options?: { projection?: Document; sort?: Document }
-  ): Promise<DataAPIResponse<Nullable<WithId<TSchema>>>> {
+    options?: FindOneRequestOptions
+  ): FindOneResponse<TSchema>;
+  async findOne(
+    filter?: Filter<TSchema>,
+    options?: FindOneRequestOptions
+  ): FindOneResponse<TSchema>;
+  async findOne(...args: unknown[]): FindOneResponse<TSchema> {
+    const [operationName, filter, options] = (
+      typeof args[0] === "string" ? args : ["default", ...args]
+    ) as [string, Filter<TSchema>?, FindOneRequestOptions?];
+
     const { data, error } = await this.callApi<{ document: WithId<TSchema> }>(
       "findOne",
       {
         filter,
         projection: options?.projection,
         sort: options?.sort,
-      }
+      },
+      { operationName }
     );
 
     if (data) {
@@ -282,6 +250,8 @@ export class Collection<TSchema = Document> {
   /**
    * Find multiple documents in the collection matching a query.
    * [example](https://www.mongodb.com/docs/atlas/api/data-api-resources/#find-multiple-documents)
+   *
+   * @param operationName The name of the operation to use for the request. This is used to set the `x-realm-op-name` header for tracing requests
    *
    * @param filter A [MongoDB Query Filter](https://www.mongodb.com/docs/manual/tutorial/query-documents/). The find action returns documents in the collection that match this filter.
    *
@@ -296,23 +266,34 @@ export class Collection<TSchema = Document> {
    * @returns An array of matching documents
    */
   async find(
+    operationName: string,
     filter?: Filter<TSchema>,
-    options?: {
-      projection?: Document;
-      sort?: Sort;
-      limit?: number;
-      skip?: number;
-    }
-  ): Promise<DataAPIResponse<WithId<TSchema>[]>> {
+    options?: FindRequestOptions
+  ): FindResponse<TSchema>;
+  async find(
+    filter?: Filter<TSchema>,
+    options?: FindRequestOptions
+  ): FindResponse<TSchema>;
+  async find(...args: unknown[]): FindResponse<TSchema> {
+    const [operationName, filter, options] = (
+      typeof args[0] === "string" ? args : ["default", ...args]
+    ) as [string, Filter<TSchema>?, FindRequestOptions?];
+
     const { data, error } = await this.callApi<{
-      documents: WithId<TSchema>[];
-    }>("find", {
-      filter,
-      projection: options?.projection,
-      sort: options?.sort,
-      limit: options?.limit,
-      skip: options?.skip,
-    });
+      documents: Array<WithId<TSchema>>;
+    }>(
+      "find",
+      {
+        filter,
+        projection: options?.projection,
+        sort: options?.sort,
+        limit: options?.limit,
+        skip: options?.skip,
+      },
+      {
+        operationName,
+      }
+    );
 
     if (data) {
       return { data: data.documents, error };
@@ -327,11 +308,26 @@ export class Collection<TSchema = Document> {
    * @returns The insertOne action returns the _id value of the inserted document as a string in the insertedId field
    */
   async insertOne(
+    operationName: string,
     document: OptionalUnlessRequiredId<TSchema>
-  ): Promise<DataAPIResponse<{ insertedId: ObjectId }>> {
-    return this.callApi("insertOne", {
-      document,
-    });
+  ): InsertOneResponse;
+  async insertOne(
+    document: OptionalUnlessRequiredId<TSchema>
+  ): InsertOneResponse;
+  async insertOne(...args: unknown[]): InsertOneResponse {
+    const [operationName, document] = (
+      typeof args[0] === "string" ? args : ["default", ...args]
+    ) as [string, OptionalUnlessRequiredId<TSchema>];
+
+    return this.callApi(
+      "insertOne",
+      {
+        document,
+      },
+      {
+        operationName,
+      }
+    );
   }
 
   /**
@@ -340,9 +336,18 @@ export class Collection<TSchema = Document> {
    * @returns The insertMany action returns the _id values of all inserted documents as an array of strings in the insertedIds field
    */
   async insertMany(
-    documents: OptionalUnlessRequiredId<TSchema>[]
-  ): Promise<DataAPIResponse<{ insertedIds: string[] }>> {
-    return this.callApi("insertMany", { documents });
+    operationName: string,
+    documents: Array<OptionalUnlessRequiredId<TSchema>>
+  ): InsertManyResponse;
+  async insertMany(
+    documents: Array<OptionalUnlessRequiredId<TSchema>>
+  ): InsertManyResponse;
+  async insertMany(...args: unknown[]): InsertManyResponse {
+    const [operationName, documents] = (
+      typeof args[0] === "string" ? args : ["default", ...args]
+    ) as [string, Array<OptionalUnlessRequiredId<TSchema>>];
+
+    return this.callApi("insertMany", { documents }, { operationName });
   }
 
   /**
@@ -358,21 +363,37 @@ export class Collection<TSchema = Document> {
    * If upsert is set to true and no documents match the filter, the action returns the `_id` value of the inserted document as a string in the `upsertedId` field
    */
   async updateOne(
+    operationName: string,
     filter: Filter<TSchema>,
     update: UpdateFilter<TSchema> | Partial<TSchema>,
-    options?: { upsert?: boolean }
-  ): Promise<
-    DataAPIResponse<{
-      matchedCount: number;
-      modifiedCount: number;
-      upsertedId?: string;
-    }>
-  > {
-    return this.callApi("updateOne", {
-      filter,
-      update,
-      upsert: options?.upsert,
-    });
+    options?: UpdateOneRequestOptions
+  ): UpdateOneResponse;
+  async updateOne(
+    filter: Filter<TSchema>,
+    update: UpdateFilter<TSchema> | Partial<TSchema>,
+    options?: UpdateOneRequestOptions
+  ): UpdateOneResponse;
+  async updateOne(...args: unknown[]): UpdateOneResponse {
+    const [operationName, filter, update, options] = (
+      typeof args[0] === "string" ? args : ["default", ...args]
+    ) as [
+      string,
+      Filter<TSchema>,
+      UpdateFilter<TSchema> | Partial<TSchema>,
+      UpdateOneRequestOptions?,
+    ];
+
+    return this.callApi(
+      "updateOne",
+      {
+        filter,
+        update,
+        upsert: options?.upsert,
+      },
+      {
+        operationName,
+      }
+    );
   }
 
   /**
@@ -388,21 +409,37 @@ export class Collection<TSchema = Document> {
    * If upsert is set to true and no documents match the filter, the action returns the `_id` value of the inserted document as a string in the `upsertedId` field
    */
   async updateMany(
+    operationName: string,
     filter: Filter<TSchema>,
     update: UpdateFilter<TSchema>,
-    options?: { upsert?: boolean }
-  ): Promise<
-    DataAPIResponse<{
-      matchedCount: number;
-      modifiedCount: number;
-      upsertedId?: string;
-    }>
-  > {
-    return this.callApi("updateMany", {
-      filter,
-      update,
-      upsert: options?.upsert,
-    });
+    options?: UpdateManyRequestOptions
+  ): UpdateManyResponse;
+  async updateMany(
+    filter: Filter<TSchema>,
+    update: UpdateFilter<TSchema>,
+    options?: UpdateManyRequestOptions
+  ): UpdateManyResponse;
+  async updateMany(...args: unknown[]): UpdateManyResponse {
+    const [operationName, filter, update, options] = (
+      typeof args[0] === "string" ? args : ["default", ...args]
+    ) as [
+      string,
+      Filter<TSchema>,
+      UpdateFilter<TSchema>,
+      UpdateManyRequestOptions?,
+    ];
+
+    return this.callApi(
+      "updateMany",
+      {
+        filter,
+        update,
+        upsert: options?.upsert,
+      },
+      {
+        operationName,
+      }
+    );
   }
 
   /**
@@ -418,21 +455,37 @@ export class Collection<TSchema = Document> {
    * If upsert is set to true and no documents match the filter, the action returns the `_id` value of the inserted document as a string in the `upsertedId` field
    */
   async replaceOne(
+    operationName: string,
     filter: Filter<TSchema>,
     replacement: WithoutId<TSchema>,
-    options?: { upsert?: boolean }
-  ): Promise<
-    DataAPIResponse<{
-      matchedCount: number;
-      modifiedCount: number;
-      upsertedId?: string;
-    }>
-  > {
-    return this.callApi("replaceOne", {
-      filter,
-      replacement,
-      upsert: options?.upsert,
-    });
+    options?: ReplaceOneRequestOptions
+  ): ReplaceOneResponse;
+  async replaceOne(
+    filter: Filter<TSchema>,
+    replacement: WithoutId<TSchema>,
+    options?: ReplaceOneRequestOptions
+  ): ReplaceOneResponse;
+  async replaceOne(...args: unknown[]): ReplaceOneResponse {
+    const [operationName, filter, replacement, options] = (
+      typeof args[0] === "string" ? args : ["default", ...args]
+    ) as [
+      string,
+      Filter<TSchema>,
+      WithoutId<TSchema>,
+      ReplaceOneRequestOptions?,
+    ];
+
+    return this.callApi(
+      "replaceOne",
+      {
+        filter,
+        replacement,
+        upsert: options?.upsert,
+      },
+      {
+        operationName,
+      }
+    );
   }
 
   /**
@@ -441,11 +494,24 @@ export class Collection<TSchema = Document> {
    * @returns The deleteOne action returns the number of deleted documents in the deletedCount field
    */
   async deleteOne(
+    operationName: string,
     filter: Filter<TSchema>
-  ): Promise<DataAPIResponse<{ deletedCount: number }>> {
-    return this.callApi("deleteOne", {
-      filter,
-    });
+  ): DeleteOneResponse;
+  async deleteOne(filter: Filter<TSchema>): DeleteOneResponse;
+  async deleteOne(...args: unknown[]): DeleteOneResponse {
+    const [operationName, filter] = (
+      typeof args[0] === "string" ? args : ["default", ...args]
+    ) as [string, Filter<TSchema>];
+
+    return this.callApi(
+      "deleteOne",
+      {
+        filter,
+      },
+      {
+        operationName,
+      }
+    );
   }
 
   /**
@@ -454,9 +520,22 @@ export class Collection<TSchema = Document> {
    * @returns The deleteMany action returns the number of deleted documents in the deletedCount field
    */
   async deleteMany(
+    operationName: string,
     filter: Filter<TSchema>
-  ): Promise<DataAPIResponse<{ deletedCount: number }>> {
-    return this.callApi("deleteMany", { filter });
+  ): DeleteManyResponse;
+  async deleteMany(filter: Filter<TSchema>): DeleteManyResponse;
+  async deleteMany(...args: unknown[]): DeleteManyResponse {
+    const [operationName, filter] = (
+      typeof args[0] === "string" ? args : ["default", ...args]
+    ) as [string, Filter<TSchema>];
+
+    return this.callApi(
+      "deleteMany",
+      { filter },
+      {
+        operationName,
+      }
+    );
   }
 
   /**
@@ -465,15 +544,37 @@ export class Collection<TSchema = Document> {
    * @returns The aggregate action returns the result set of the final stage of the pipeline as an array of documents, automatically unwrapping the Atlas `documents` field
    */
   async aggregate<TOutput = Document>(
+    operationName: string,
     pipeline: Document[]
-  ): Promise<DataAPIResponse<TOutput[]>> {
-    const response = await this.callApi<{ documents: TOutput[] }>("aggregate", {
-      pipeline,
-    });
+  ): AggregateResponse<TOutput[]>;
+  async aggregate<TOutput = Document>(
+    pipeline: Document[]
+  ): AggregateResponse<TOutput[]>;
+  async aggregate<TOutput = Document>(
+    ...args: unknown[]
+  ): AggregateResponse<TOutput[]> {
+    const [operationName, pipeline] = (
+      typeof args[0] === "string" ? args : ["default", ...args]
+    ) as [string, Document[]];
 
-    return response.data
-      ? { data: response.data.documents }
-      : { error: response.error ?? new MongoDataAPIError("Unknown error", -1) };
+    const response = await this.callApi<{ documents: TOutput[] }>(
+      "aggregate",
+      {
+        pipeline,
+      },
+      {
+        operationName,
+      }
+    );
+
+    // unwrap and repackage
+    return (
+      response.data
+        ? { data: response.data.documents }
+        : {
+            error: response.error ?? new MongoDataAPIError("Unknown error", -1),
+          }
+    ) as Awaited<AggregateResponse<TOutput[]>>;
   }
 
   /**
@@ -484,13 +585,27 @@ export class Collection<TSchema = Document> {
    */
   async callApi<T = unknown>(
     method: string,
-    body: Record<string, unknown>
+    body: Record<string, unknown>,
+    requestOptions: callAPIOptions
   ): Promise<DataAPIResponse<T>> {
-    const { endpoint, dataSource, headers, collection, database } =
-      this.connection;
+    // merge all options
+    const {
+      endpoint,
+      dataSource,
+      headers: h,
+      collection,
+      database,
+      fetch: ftch,
+    } = this.connection;
+
+    const headers = new Headers(h);
+    if (requestOptions.operationName) {
+      headers.set("x-realm-op-name", requestOptions.operationName);
+    }
+
     const url = `${endpoint}/action/${method}`;
 
-    const response = await this.ftch(url, {
+    const response = await ftch(url, {
       method: "POST",
       headers,
       body: EJSON.stringify({

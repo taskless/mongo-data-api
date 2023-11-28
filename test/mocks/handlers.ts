@@ -3,8 +3,6 @@ import { rest } from "msw";
 export const BASE_URL =
   "https://data.mongodb-api.com/app/validClientAppId/endpoint/data/v1";
 
-export const X_RESPONSE_KEY = "x-test-condition";
-
 // sub: ok
 // alg: HS256
 // typ: JWT
@@ -88,6 +86,7 @@ export const payloads: Record<string, Record<string, any>> = {
         },
       ],
     },
+    error: null,
   },
 };
 
@@ -108,8 +107,8 @@ export const errors: Record<string, { error: string }> = {
 
 /** Helper function to forcefully cast something to an array */
 function asArray<T>(
-  value: (T | undefined) | (T | undefined)[] | readonly (T | undefined)[]
-): (T | undefined)[] {
+  value: (T | undefined) | Array<T | undefined> | ReadonlyArray<T | undefined>
+): Array<T | undefined> {
   return (Array.isArray(value) ? value : [value]) as T[];
 }
 
@@ -162,8 +161,12 @@ export const handlers = [
       return response(ctx.status(401), ctx.json(errors["401"]));
     }
 
-    // a "X-FORCE-ERROR" header can be used to force a specific error
-    const forceError = request.headers.get("x-force-error");
+    const u = new URL(
+      "http://localhost?" + request.headers.get("x-realm-op-name")
+    );
+    const operation = u.searchParams;
+
+    const forceError = operation.get("error");
     if (forceError && errors[forceError]) {
       return response(
         ctx.status(Number(forceError)),
@@ -188,7 +191,7 @@ export const handlers = [
       throw new Error(`Unhandled test action ${action}`);
     }
 
-    const condition = request.headers.get(X_RESPONSE_KEY) ?? "success";
+    const condition = operation.get("condition") ?? "success";
     const payload = conditions[condition] as unknown;
 
     if (condition === "raw") {
@@ -196,9 +199,9 @@ export const handlers = [
       return undefined;
     }
 
-    if (!payload) {
+    if (!payload && payload !== null) {
       throw new Error(
-        `Unhandled test action + condition ${action} + ${condition}`
+        `Unhandled test action + condition: ${action} + ${condition}`
       );
     }
 
