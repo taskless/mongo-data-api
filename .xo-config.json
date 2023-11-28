@@ -3,10 +3,6 @@
   "space": true,
   "nodeVersion": false,
   "rules": {
-    "@typescript-eslint/array-type": [
-      "error",
-      { "default": "array", "readonly": "array" }
-    ],
     "@typescript-eslint/naming-convention": "off",
     "@typescript-eslint/no-floating-promises": "off",
     "@typescript-eslint/parameter-properties": [

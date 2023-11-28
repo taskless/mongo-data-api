@@ -6,7 +6,6 @@ import { MongoDataAPIError } from "../src/errors.js";
 import {
   BASE_URL,
   payloads,
-  X_RESPONSE_KEY,
   type TestDocument,
   type TestAggregateDocument,
 } from "./mocks/handlers.js";
@@ -33,13 +32,12 @@ const addMsw = (
   t.context.msw = s;
 };
 
-const createMongoClient = (headers?: Headers) => {
+const createMongoClient = () => {
   const c = new MongoClient({
     endpoint: BASE_URL,
     dataSource: "test-datasource",
     auth: { apiKey: "validApiKey" },
     fetch,
-    headers,
   });
 
   return c;
@@ -109,11 +107,16 @@ test("api: updateOne", async (t) => {
 
 test("api: updateOne upsert", async (t) => {
   addMsw(t);
-  const c = createMongoClient(new Headers({ [X_RESPONSE_KEY]: "upsert" }));
+  const c = createMongoClient();
   const { data, error } = await c
     .db("test-db")
     .collection<TestDocument>("test-collection")
-    .updateOne({ test: "test" }, { test: "tested" }, { upsert: true });
+    .updateOne(
+      "condition=upsert",
+      { test: "test" },
+      { test: "tested" },
+      { upsert: true }
+    );
 
   t.is(error, undefined);
   t.deepEqual(data, payloads.updateOne.upsert);
@@ -133,11 +136,16 @@ test("api: updateMany", async (t) => {
 
 test("api: updateMany upsert", async (t) => {
   addMsw(t);
-  const c = createMongoClient(new Headers({ [X_RESPONSE_KEY]: "upsert" }));
+  const c = createMongoClient();
   const { data, error } = await c
     .db("test-db")
     .collection<TestDocument>("test-collection")
-    .updateMany({ test: "test" }, { test: "tested" }, { upsert: true });
+    .updateMany(
+      "condition=upsert",
+      { test: "test" },
+      { test: "tested" },
+      { upsert: true }
+    );
 
   t.is(error, undefined);
   t.deepEqual(data, payloads.updateMany.upsert);
@@ -157,11 +165,16 @@ test("api: replaceOne", async (t) => {
 
 test("api: replaceOne upsert", async (t) => {
   addMsw(t);
-  const c = createMongoClient(new Headers({ [X_RESPONSE_KEY]: "upsert" }));
+  const c = createMongoClient();
   const { data, error } = await c
     .db("test-db")
     .collection<TestDocument>("test-collection")
-    .replaceOne({ test: "test" }, { test: "tested" }, { upsert: true });
+    .replaceOne(
+      "condition=upsert",
+      { test: "test" },
+      { test: "tested" },
+      { upsert: true }
+    );
 
   t.is(error, undefined);
   t.deepEqual(data, payloads.replaceOne.upsert);
@@ -210,6 +223,26 @@ test("api: aggregate", async (t) => {
 
   t.is(error, undefined);
   t.deepEqual(data, payloads.aggregate.success.documents);
+});
+
+test("api: aggregate error", async (t) => {
+  addMsw(t);
+  const c = createMongoClient();
+  const { data, error } = await c
+    .db("test-db")
+    .collection("test-collection")
+    .aggregate<TestAggregateDocument>("condition=error", [
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+          text: { $push: "$text" },
+        },
+      },
+      { $sort: { count: 1 } },
+    ]);
+
+  t.truthy(error);
 });
 
 test("auth: disabled data source results in 400 from Mongo", async (t) => {
@@ -269,11 +302,13 @@ test("auth: bad client ID results in 404 from Mongo", async (t) => {
 
 test("error: Force a 500 error in case Mongo has an internal server error", async (t) => {
   addMsw(t);
-  const c = createMongoClient(new Headers({ "x-force-error": "500" }));
+  const c = createMongoClient();
   const { data, error } = await c
     .db("test-db")
     .collection<TestDocument>("test-collection")
-    .findOne({ _id: new ObjectId("6193504e1be4ab27791c8133") });
+    .findOne("error=500", {
+      _id: new ObjectId("6193504e1be4ab27791c8133"),
+    });
 
   t.is(data, undefined);
   t.truthy(error instanceof MongoDataAPIError);

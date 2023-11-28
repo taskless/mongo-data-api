@@ -3,8 +3,8 @@ import fetch from "cross-fetch";
 import { MongoClient } from "../src/client.js";
 import { BASE_URL } from "./mocks/handlers.js";
 
-test("requires a fetch interface", (t) => {
-  t.throws(() => {
+test("requires a valid fetch interface", async (t) => {
+  await t.throwsAsync(async () => {
     const c = new MongoClient({
       endpoint: BASE_URL,
       dataSource: "test-datasource",
@@ -12,6 +12,7 @@ test("requires a fetch interface", (t) => {
       // @ts-expect-error intentionally knocking out the fetch interface
       fetch: "not a fetch interface",
     });
+    await c.db("any").collection("any").find();
   });
 });
 

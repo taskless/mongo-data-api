@@ -15,9 +15,9 @@
   - [Create a Mongo Client](#create-a-mongo-client)
   - [Select a Database](#select-a-database)
   - [Select a Collection](#select-a-collection)
-  - [Changing `fetch()` on the Fly](#changing-fetch-on-the-fly)
   - [Collection Methods](#collection-methods)
     - [Return Type](#return-type)
+    - [Specifying Operation Names](#specifying-operation-names)
     - [Methods](#methods)
       - [findOne](#findone)
       - [find](#find)
@@ -130,7 +130,6 @@ const client = new MongoClient(options);
   - `options.dataSource` - `string` the `Data Source` for your Data API. On the Data API UI, this is the "Data Source" column, and usually is either a 1:1 mapping of your cluster name, or the default `mongodb-atlas` if you enabled Data API through the Atlas Admin UI.
   - `options.auth` - `AuthOptions` one of the authentication methods, either api key, email & password, or a custom JWT string. At this time, only [Credential Authentication](https://www.mongodb.com/docs/atlas/api/data-api/#credential-authentication) is supported.
   - `options.fetch?` - A custom `fetch` function conforming to the [native fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API). We recommend [cross-fetch](https://www.npmjs.com/package/cross-fetch), as it asserts a complaint `fetch()` interface and avoids you having to do `fetch: _fetch as typeof fetch` to satisfy the TypeScript compiler
-  - `options.headers?` - Additional [Headers](https://developer.mozilla.org/en-US/docs/Web/API/Headers) to include with the request. May also be a simple object of key/value pairs.
 
 ## Select a Database
 
@@ -148,15 +147,6 @@ const collection = db.collection<TSchema>(collectionName);
 
 - `collectionName` - `string` the name of the collection to connect to
 - `<TSchema>` - _generic_ A Type or Interface that describes the documents in this collection. Defaults to the generic MongoDB `Document` type
-
-## Changing `fetch()` on the Fly
-
-```ts
-const altDb = db.fetch(altFetch);
-const altCollection = db.collection<TSchema>(collectionName).fetch(altFetch);
-```
-
-- `altFetch` - An alternate `fetch` implementation that will be used for that point forward. Useful for adding or removing retry support on a per-call level, changing the authentication required, or other fetch middleware operations.
 
 ## Collection Methods
 
@@ -186,6 +176,14 @@ interface DataAPIResponse {
   data?: TSchema;
   error?: DataAPIError;
 }
+```
+
+### Specifying Operation Names
+
+To help with tracing and debugging, any Mongo Data API operation can be named by passing a string as the first parameter. This value is converted to the `x-realm-op-name` header and can be seen in the [Mongo Data API logs](https://www.mongodb.com/docs/atlas/api/data-api/#view-data-api-logs).
+
+```ts
+const { data, error } = await collection./*operation*/("operation name for tracing", filter, options);
 ```
 
 ### Methods
