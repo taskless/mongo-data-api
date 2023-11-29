@@ -6,7 +6,7 @@ import { type MongoDataAPIError } from "./errors.js";
 // eslint-disable-next-line @typescript-eslint/ban-types
 type Nullable<T> = T | null;
 
-/** A data API response object */
+/** A generic data API response object */
 export type DataAPIResponse<T> = { data?: T; error?: MongoDataAPIError };
 
 export type FindOneRequestOptions = { projection?: Document; sort?: Document };
@@ -16,7 +16,7 @@ export type FindOneResponse<TSchema> = Promise<
   DataAPIResponse<Nullable<WithId<TSchema>>>
 >;
 
-/** The MongoDB-specific options for this API method */
+/** The MongoDB-specific options for the find() method */
 export type FindRequestOptions = {
   projection?: Document;
   sort?: Sort;
@@ -24,25 +24,25 @@ export type FindRequestOptions = {
   skip?: number;
 };
 
-/** A data API response object */
+/** A data API response object for the find() method */
 export type FindResponse<TSchema> = Promise<
   DataAPIResponse<Array<WithId<TSchema>>>
 >;
 
-/** A data API response object */
+/** A data API response object for the insertOne() method */
 export type InsertOneResponse = Promise<
   DataAPIResponse<{ insertedId: ObjectId }>
 >;
 
-/** A data API response object */
+/** A data API response object for the insertMany() method */
 export type InsertManyResponse = Promise<
   DataAPIResponse<{ insertedIds: string[] }>
 >;
 
-/** The MongoDB-specific options for this API method */
+/** The MongoDB-specific options for the updateOne() method */
 export type UpdateOneRequestOptions = { upsert?: boolean };
 
-/** A data API response object */
+/** A data API response object for the updateOne() method */
 export type UpdateOneResponse = Promise<
   DataAPIResponse<{
     matchedCount: number;
@@ -51,10 +51,10 @@ export type UpdateOneResponse = Promise<
   }>
 >;
 
-/** The MongoDB-specific options for this API method */
+/** The MongoDB-specific options for the updateMany() method */
 export type UpdateManyRequestOptions = { upsert?: boolean };
 
-/** A data API response object */
+/** A data API response object for the updateMany() method */
 export type UpdateManyResponse = Promise<
   DataAPIResponse<{
     matchedCount: number;
@@ -63,10 +63,10 @@ export type UpdateManyResponse = Promise<
   }>
 >;
 
-/** The MongoDB-specific options for this API method */
+/** The MongoDB-specific options for the replaceOne() method */
 export type ReplaceOneRequestOptions = { upsert?: boolean };
 
-/** A data API response object */
+/** A data API response object for the replaceOne() method */
 export type ReplaceOneResponse = Promise<
   DataAPIResponse<{
     matchedCount: number;
@@ -75,17 +75,17 @@ export type ReplaceOneResponse = Promise<
   }>
 >;
 
-/** A data API response object */
+/** A data API response object for the deleteOne() method */
 export type DeleteOneResponse = Promise<
   DataAPIResponse<{ deletedCount: number }>
 >;
 
-/** A data API response object */
+/** A data API response object for the deleteMany() method */
 export type DeleteManyResponse = Promise<
   DataAPIResponse<{ deletedCount: number }>
 >;
 
-/** A data API response object */
+/** A data API response object for the aggregate() method */
 export type AggregateResponse<TOutput = Document> = Promise<
   DataAPIResponse<TOutput[]>
 >;
