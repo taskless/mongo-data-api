@@ -626,11 +626,14 @@ export class Collection<TSchema = Document> {
         errorText = ((await response.clone().json()) as { error: string })
           ?.error;
       } catch {
+        /* c8 ignore start */
+        // used to ensure maximum chance of retieving data from the Realm API
         try {
           errorText = await response.clone().text();
         } catch {
           errorText = undefined;
         }
+        /* c8 ignore stop */
       }
 
       const fallbackMessage = {

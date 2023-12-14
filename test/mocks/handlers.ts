@@ -142,6 +142,11 @@ export const handlers = [
       return response(ctx.status(400), ctx.json(errors["400"]));
     }
 
+    // missing ejson header is a hard 400 error
+    if (!request.headers.get("content-type")?.includes("application/ejson")) {
+      return response(ctx.status(400), ctx.json(errors["400"]));
+    }
+
     // incorrect auth results in a 401 from mongo
     let auth = false;
     if (request.headers.get("authorization") === `Bearer ${validJWT}`) {
