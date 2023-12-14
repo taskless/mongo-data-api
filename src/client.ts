@@ -599,6 +599,8 @@ export class Collection<TSchema = Document> {
     } = this.connection;
 
     const headers = new Headers(h);
+    headers.set("content-type", "application/ejson");
+
     if (requestOptions.operationName) {
       headers.set("x-realm-op-name", requestOptions.operationName);
     }
@@ -621,9 +623,14 @@ export class Collection<TSchema = Document> {
     if (response.status < 200 || response.status >= 400) {
       let errorText: string | undefined;
       try {
-        errorText = ((await response.json()) as { error: string })?.error;
+        errorText = ((await response.clone().json()) as { error: string })
+          ?.error;
       } catch {
-        /* c8 ignore next */
+        try {
+          errorText = await response.clone().text();
+        } catch {
+          errorText = undefined;
+        }
       }
 
       const fallbackMessage = {
