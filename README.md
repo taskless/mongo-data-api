@@ -1,3 +1,7 @@
+<h1>
+  Deprecation Notice: With MongoDB retiring realm applications, this project will no longer fulfill its intended purpose. It's our hope the Mongo team will reintroduce HTTP APIs for their excellent document DB project
+</h1>
+
 <h1 align="center">
   <span style="font-size:24px">🌿🕸️ Mongo Data API</span><br />
   <sub><i>Mongo Client for an HTTPS World. Lambda and edge function friendly</i></sub>
